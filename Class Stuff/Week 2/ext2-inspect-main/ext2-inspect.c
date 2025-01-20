@@ -24,6 +24,7 @@ typedef struct EXT2_SUPERBLOCK
                        // but it's stuff we don't care about right now
                        // (e.g., s_free_blocks_count).
     uint16_t magic;
+   
 } ext2_superblock;
 #pragma pack(pop)
 
@@ -31,7 +32,8 @@ int main( int argc, char **argv )
 {
     int exit_code = EXIT_SUCCESS;
     int fd = -1;
-
+    uint32_t inode_count = 0;
+    uint32_t block_count = 0;
     if ( argc != 2 )
     {
         fprintf( stderr, "Usage: ./ext2-inspect <ext2-volume>\n" );
@@ -41,10 +43,13 @@ int main( int argc, char **argv )
     {
         fd = open( argv[1], O_RDONLY );
 
-        // we're going to remove this line as soon as we start working with the
-        // volume, this is here so that we can actually compile the skeleton
-        // code that doesn't do anything.
-        (void) fd;
+        // to get to the supetblock, we have to go 10 
+        // This is the same as 0x4000 
+        lseek(fd, 0x400,SEEK_SET);
+
+        read(fd, &inode_count,4);
+        printf("# of inodes: %d\n", inode_count
+        
     }
 
     return exit_code;
