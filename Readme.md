@@ -1,3 +1,3 @@
-### Drifka Operating Systems -- Winer 2025
+### Drifka Operating Systems -- Winter 2025
 ![Alt text](Assets/Drifka.jpg)
 
