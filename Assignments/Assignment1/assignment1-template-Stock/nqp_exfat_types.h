@@ -4,9 +4,9 @@
 #pragma pack(push, 1)
 typedef struct MAIN_BOOT_RECORD
 {
-    uint8_t  jump_boot[3];
-    char     fs_name[8];
-    uint8_t  must_be_zero[53];
+    uint8_t jump_boot[3];
+    char fs_name[8];
+    uint8_t must_be_zero[53];
     uint64_t partition_offset;
     uint64_t volume_length;
     uint32_t fat_offset;
@@ -17,16 +17,20 @@ typedef struct MAIN_BOOT_RECORD
     uint32_t volume_serial_number;
     uint16_t fs_revision;
     uint16_t fs_flags;
-    uint8_t  bytes_per_sector_shift;
-    uint8_t  sectors_per_cluster_shift;
-    uint8_t  number_of_fats;
-    uint8_t  drive_select;
-    uint8_t  percent_in_use;
-    uint8_t  reserved[7];
-    uint8_t  bootcode[390];
+    uint8_t bytes_per_sector_shift;
+    uint8_t sectors_per_cluster_shift;
+    uint8_t number_of_fats;
+    uint8_t drive_select;
+    uint8_t percent_in_use;
+    uint8_t reserved[7];
+    uint8_t bootcode[390];
     uint16_t boot_signature;
 } main_boot_record;
 #pragma pack(pop)
+
+// A header containing exFAT-implementation-specific structures and values is also provided for your convenience
+//(nqp_exfat_types.h). The types header file contains pre-defined structures for the main boot sector,
+// directory entries, and identifying values for directory entries.
 
 #pragma pack(push, 1)
 typedef struct FILE_DENTRY
@@ -50,9 +54,9 @@ typedef struct FILE_DENTRY
 #pragma pack(push, 1)
 typedef struct GENERAL_SECONDARY_FLAGS
 {
-    uint8_t allocation_possible:1;
-    uint8_t no_fat_chain:1;
-    uint8_t custom_defined:6;
+    uint8_t allocation_possible : 1;
+    uint8_t no_fat_chain : 1;
+    uint8_t custom_defined : 6;
 } secondary_flags;
 #pragma pack(pop)
 
@@ -102,7 +106,8 @@ typedef struct VOLUME_LABEL
 typedef struct DIRECTORY_ENTRY
 {
     uint8_t entry_type;
-    union {
+    union
+    {
         allocation_bitmap bitmap;
         volume_label label;
         file_dentry file;
@@ -120,12 +125,12 @@ typedef struct ENTRY_SET
 } entry_set;
 
 #define DENTRY_TYPE_ALLOCATION_BITMAP 0x81
-#define DENTRY_TYPE_UP_CASE_TABLE     0x82
-#define DENTRY_TYPE_VOLUME_LABEL      0x83
-#define DENTRY_TYPE_FILE              0x85
-#define DENTRY_TYPE_VOLUME_GUID       0xA0
-#define DENTRY_TYPE_TEXFAT_PADDING    0xA1
-#define DENTRY_TYPE_WINCE_ACT         0xA2
-#define DENTRY_TYPE_STREAM_EXTENSION  0xC0
-#define DENTRY_TYPE_FILE_NAME         0xC1
-#define DENTRY_TYPE_END               0x00
+#define DENTRY_TYPE_UP_CASE_TABLE 0x82
+#define DENTRY_TYPE_VOLUME_LABEL 0x83
+#define DENTRY_TYPE_FILE 0x85
+#define DENTRY_TYPE_VOLUME_GUID 0xA0
+#define DENTRY_TYPE_TEXFAT_PADDING 0xA1
+#define DENTRY_TYPE_WINCE_ACT 0xA2
+#define DENTRY_TYPE_STREAM_EXTENSION 0xC0
+#define DENTRY_TYPE_FILE_NAME 0xC1
+#define DENTRY_TYPE_END 0x00
