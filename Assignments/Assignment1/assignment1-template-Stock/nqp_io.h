@@ -10,10 +10,11 @@
 
 typedef enum NQP_FS_TYPE
 {
-    NQP_FS_EXFAT,
+    NQP_FS_EXFAT, // Currently only one supported file System
 
     // NQP_FS_TYPES should always be last
-    NQP_FS_TYPES
+
+    NQP_FS_TYPES // Placeholder for additional file system types.
 } nqp_fs_type;
 
 typedef enum NQP_DIRECTORY_ENTRY_TYPE

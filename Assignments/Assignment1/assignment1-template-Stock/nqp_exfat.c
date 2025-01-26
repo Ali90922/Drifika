@@ -73,6 +73,13 @@ char *unicode2ascii(uint16_t *unicode_string, uint8_t length)
  */
 nqp_error nqp_mount(const char *source, nqp_fs_type fs_type)
 {
+
+    // Validate Parameters :
+    if (source == NULL || fs_type != NQP_FS_EXFAT)
+    {
+        return NQP_INVAL;
+    }
+
     (void)source;
     (void)fs_type;
 
