@@ -1,8 +1,14 @@
 #include <assert.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "nqp_io.h"
 #include "nqp_exfat_types.h"
+
+// Global state for the mounted file system
+static FILE *fs_image = NULL; // File pointer for the file system image
+static int is_mounted = 0;    // Flag to indicate if the FS is mounted
+static main_boot_record mbr;  // Stores the Main Boot Record data
 
 // My Task is to :
 // Implement the functionality for the five functions in nqp_io.h.
