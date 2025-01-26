@@ -75,7 +75,15 @@ nqp_error nqp_mount(const char *source, nqp_fs_type fs_type)
 {
 
     // Validate Parameters :
-    if (source == NULL || fs_type != NQP_FS_EXFAT)
+
+    // Validate the file system type
+    if (fs_type != NQP_FS_EXFAT)
+    {
+        return NQP_UNSUPPORTED_FS;
+    }
+
+    // Validate the source (e.g., check if it's NULL)
+    if (source == NULL)
     {
         return NQP_INVAL;
     }
