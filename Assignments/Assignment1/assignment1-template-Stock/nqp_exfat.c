@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "nqp_io.h"
 #include "nqp_exfat_types.h"
@@ -10,159 +11,141 @@ static FILE *fs_image = NULL; // File pointer for the file system image
 static int is_mounted = 0;    // Flag to indicate if the FS is mounted
 static main_boot_record mbr;  // Stores the Main Boot Record data
 
-// My Task is to :
-// Implement the functionality for the five functions in nqp_io.h.
-// Ensure they correctly handle the exFAT file system format as described in the  nqp_exfat_types.h header file
-
 /**
  * Convert a Unicode-formatted string containing only ASCII characters
- * into a regular ASCII-formatted string (16 bit chars to 8 bit
- * chars).
- *
- * NOTE: this function does a heap allocation for the string it
- *       returns (like strdup), caller is responsible for `free`-ing the
- *       allocation when necessary.
- *
- * uint16_t *unicode_string: the Unicode-formatted string to be
- *                           converted.
- * uint8_t   length: the length of the Unicode-formatted string (in
- *                   characters).
- *
- * returns: a heap allocated ASCII-formatted string.
+ * into a regular ASCII-formatted string (16-bit chars to 8-bit chars).
  */
 char *unicode2ascii(uint16_t *unicode_string, uint8_t length)
 {
     assert(unicode_string != NULL);
     assert(length > 0);
 
-    char *ascii_string = NULL;
-
-    if (unicode_string != NULL && length > 0)
+    char *ascii_string = calloc(length + 1, sizeof(char)); // Allocate memory for ASCII string
+    if (ascii_string)
     {
-        // +1 for a NULL terminator
-        ascii_string = calloc(sizeof(char), length + 1);
-
-        if (ascii_string)
+        for (uint8_t i = 0; i < length; i++)
         {
-            // strip the top 8 bits from every character in the
-            // unicode string
-            for (uint8_t i = 0; i < length; i++)
-            {
-                ascii_string[i] = (char)unicode_string[i];
-            }
-            // stick a null terminator at the end of the string.
-            ascii_string[length] = '\0';
+            ascii_string[i] = (char)(unicode_string[i] & 0xFF); // Strip the top 8 bits
         }
+        ascii_string[length] = '\0'; // Null-terminate the string
     }
-
     return ascii_string;
 }
 
-// My job starts from here :
-
 /**
- * "Mount" a file system.
- *
- * This function must be called before interacting with any other nqp_*
- * functions (they will all use the "mounted" file system).
- *
- * This function does a basic file system check on the super block of the file
- * system being mounted.
- *
- * Parameters:
- *  * source: The file containing the file system to mount. Must not be NULL.
- *  * fs_type: The type of the file system. Must be a value from nqp_fs_type.
- * Return: NQP_UNSUPPORTED_FS if the current implementation does not support
- *         the file system specified, NQP_FSCK_FAIL if the super block does not
- *         pass the basic file system check, NQP_INVAL if an invalid argument
- *         has been passed (e.g., NULL),or NQP_OK on success.
+ * Mount the file system.
  */
 nqp_error nqp_mount(const char *source, nqp_fs_type fs_type)
 {
-
-    // Validate Parameters :
-
-    // Validate the file system type
+    // Validate input parameters
+    if (!source)
+    {
+        return NQP_INVAL;
+    }
     if (fs_type != NQP_FS_EXFAT)
     {
         return NQP_UNSUPPORTED_FS;
     }
 
-    // Validate the source (e.g., check if it's NULL)
-    if (source == NULL)
+    // Open the file system image
+    fs_image = fopen(source, "rb");
+    if (!fs_image)
     {
         return NQP_INVAL;
     }
 
-    (void)source;
-    (void)fs_type;
+    // Read the Main Boot Record
+    if (fread(&mbr, sizeof(main_boot_record), 1, fs_image) != 1)
+    {
+        fclose(fs_image);
+        fs_image = NULL;
+        return NQP_FSCK_FAIL;
+    }
 
-    return NQP_INVAL;
+    // Validate the file system name and boot signature
+    if (strncmp(mbr.fs_name, "EXFAT   ", 8) != 0 || mbr.boot_signature != 0xAA55)
+    {
+        fclose(fs_image);
+        fs_image = NULL;
+        return NQP_FSCK_FAIL;
+    }
+
+    // Set the mounted state
+    is_mounted = 1;
+    return NQP_OK;
 }
 
 /**
- * "Unmount" the mounted file system.
- *
- * This function should be called to flush any changes to the file system's
- * volume (there shouldn't be! All operations are read only.)
- *
- * Return: NQP_INVAL on error (e.g., there is no fs currently mounted) or
- *         NQP_OK on success.
+ * Unmount the file system.
  */
-
 nqp_error nqp_unmount(void)
 {
-    return NQP_INVAL;
+    if (!is_mounted || !fs_image)
+    {
+        return NQP_INVAL;
+    }
+    fclose(fs_image);
+    fs_image = NULL;
+    is_mounted = 0;
+    return NQP_OK;
 }
 
 /**
- * Open the file at pathname in the "mounted" file system.
- *
- * Parameters:
- *  * pathname: The path of the file or directory in the file system that
- *              should be opened.  Must not be NULL.
- * Return: -1 on error, or a nonnegative integer on success. The nonnegative
- *         integer is a file descriptor.
+ * Open a file in the mounted file system.
  */
-
 int nqp_open(const char *pathname)
 {
-    (void)pathname;
+    if (!is_mounted || !pathname)
+    {
+        return -1;
+    }
 
-    return NQP_INVAL;
+    // For simplicity, we only search the root directory in this example.
+    // Locate the file in the directory structure (not fully implemented here).
+
+    // Placeholder: file found successfully
+    return 0; // File descriptor (e.g., an index in an open file table)
 }
 
 /**
  * Close the file referred to by the descriptor.
- *
- * Parameters:
- *  * fd: The file descriptor to close. Must be a nonnegative integer.
- * Return: -1 on error or 0 on success.
  */
-
 int nqp_close(int fd)
 {
-    (void)fd;
+    if (!is_mounted || fd < 0)
+    {
+        return -1;
+    }
 
-    return NQP_INVAL;
+    // Placeholder: Close the file (not fully implemented)
+    return 0;
 }
 
 /**
- * Read from a file desriptor.
- *
- * Parameters:
- *  * fd: The file descriptor to read from. Must be a nonnegative integer. The
- *        file descriptor should refer to a file, not a directory.
- *  * buffer: The buffer to read data into. Must not be NULL.
- *  * count: The number of bytes to read into the buffer.
- * Return: The number of bytes read, 0 at the end of the file, or -1 on error.
+ * Read data from a file.
  */
-
 ssize_t nqp_read(int fd, void *buffer, size_t count)
 {
-    (void)fd;
-    (void)buffer;
-    (void)count;
+    if (!is_mounted || fd < 0 || !buffer || count == 0)
+    {
+        return -1;
+    }
 
-    return NQP_INVAL;
+    // Placeholder: Read data from the file (not fully implemented)
+    size_t bytes_read = 0; // Replace with actual read logic
+    return bytes_read;
+}
+
+/**
+ * Get directory entries for a directory.
+ */
+ssize_t nqp_getdents(int fd, void *dirp, size_t count)
+{
+    if (!is_mounted || fd < 0 || !dirp || count < sizeof(nqp_dirent))
+    {
+        return -1;
+    }
+
+    // Placeholder: Retrieve directory entries (not fully implemented)
+    return 0; // Return total bytes written to the buffer
 }
