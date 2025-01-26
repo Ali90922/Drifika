@@ -2,6 +2,8 @@
 #include <stdint.h>
 
 #pragma pack(push, 1)
+
+// Represents the main boot record of an exFAT volume, containing essential metadata about the file system
 typedef struct MAIN_BOOT_RECORD
 {
     uint8_t jump_boot[3];
@@ -31,6 +33,8 @@ typedef struct MAIN_BOOT_RECORD
 // A header containing exFAT-implementation-specific structures and values is also provided for your convenience
 //(nqp_exfat_types.h). The types header file contains pre-defined structures for the main boot sector,
 // directory entries, and identifying values for directory entries.
+
+// Represents a file directory entry, containing metadata about a file
 
 #pragma pack(push, 1)
 typedef struct FILE_DENTRY
