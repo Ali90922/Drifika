@@ -1,0 +1,14 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     cat
+relocations:
+  - { offsetInCU: 0x26, offset: 0x26, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x0, symBinAddr: 0x100003B48, symSize: 0x1D4 }
+  - { offsetInCU: 0x7A, offset: 0x7A, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x0, symBinAddr: 0x100003B48, symSize: 0x1D4 }
+  - { offsetInCU: 0x26, offset: 0x195, size: 0x8, addend: 0x0, symName: _unicode2ascii, symObjAddr: 0x0, symBinAddr: 0x100003D1C, symSize: 0x174 }
+  - { offsetInCU: 0x99, offset: 0x208, size: 0x8, addend: 0x0, symName: _unicode2ascii, symObjAddr: 0x0, symBinAddr: 0x100003D1C, symSize: 0x174 }
+  - { offsetInCU: 0xF9, offset: 0x268, size: 0x8, addend: 0x0, symName: _nqp_mount, symObjAddr: 0x174, symBinAddr: 0x100003E90, symSize: 0x18 }
+  - { offsetInCU: 0x12F, offset: 0x29E, size: 0x8, addend: 0x0, symName: _nqp_unmount, symObjAddr: 0x18C, symBinAddr: 0x100003EA8, symSize: 0x8 }
+  - { offsetInCU: 0x148, offset: 0x2B7, size: 0x8, addend: 0x0, symName: _nqp_open, symObjAddr: 0x194, symBinAddr: 0x100003EB0, symSize: 0x14 }
+  - { offsetInCU: 0x170, offset: 0x2DF, size: 0x8, addend: 0x0, symName: _nqp_close, symObjAddr: 0x1A8, symBinAddr: 0x100003EC4, symSize: 0x14 }
+  - { offsetInCU: 0x198, offset: 0x307, size: 0x8, addend: 0x0, symName: _nqp_read, symObjAddr: 0x1BC, symBinAddr: 0x100003ED8, symSize: 0x1C }
+...
