@@ -55,6 +55,7 @@ typedef struct FILE_DENTRY
 } file_dentry;
 #pragma pack(pop)
 
+// Represents flags in secondary directory entries
 #pragma pack(push, 1)
 typedef struct GENERAL_SECONDARY_FLAGS
 {
@@ -63,6 +64,8 @@ typedef struct GENERAL_SECONDARY_FLAGS
     uint8_t custom_defined : 6;
 } secondary_flags;
 #pragma pack(pop)
+
+//  Describes the data stream for a file
 
 #pragma pack(push, 1)
 typedef struct STREAM_EXTENSION
@@ -79,6 +82,7 @@ typedef struct STREAM_EXTENSION
 } stream_extension;
 #pragma pack(pop)
 
+// Stores the name for the file
 #pragma pack(push, 1)
 typedef struct FILE_NAME
 {
@@ -87,16 +91,19 @@ typedef struct FILE_NAME
 } file_name;
 #pragma pack(pop)
 
+// Tracks which clusters are allocated or
+
 #pragma pack(push, 1)
 typedef struct ALLOCATION_BITMAP
 {
-    uint8_t bitmap_flags;
+    uint8_t bitmap_flaJgs;
     uint8_t reserved[18];
     uint32_t first_cluster;
     uint64_t data_length;
 } allocation_bitmap;
 #pragma pack(pop)
 
+// Represents the label of the file system
 #pragma pack(push, 1)
 typedef struct VOLUME_LABEL
 {
@@ -105,6 +112,8 @@ typedef struct VOLUME_LABEL
     uint64_t reserved;
 } volume_label;
 #pragma pack(pop)
+
+// Represents a directory entry, which can be one of several types
 
 #pragma pack(push, 1)
 typedef struct DIRECTORY_ENTRY
@@ -120,6 +129,9 @@ typedef struct DIRECTORY_ENTRY
     };
 } directory_entry;
 #pragma pack(pop)
+
+// Groups related entries for a file.
+// Groups the file Directory Entry, Stream extension and filename --
 
 typedef struct ENTRY_SET
 {
@@ -138,3 +150,5 @@ typedef struct ENTRY_SET
 #define DENTRY_TYPE_STREAM_EXTENSION 0xC0
 #define DENTRY_TYPE_FILE_NAME 0xC1
 #define DENTRY_TYPE_END 0x00
+
+// Structure Exaplined
