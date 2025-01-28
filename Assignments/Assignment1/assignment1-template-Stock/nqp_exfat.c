@@ -50,6 +50,7 @@ char *unicode2ascii(uint16_t *unicode_string, uint8_t length)
  */
 nqp_error nqp_mount(const char *source, nqp_fs_type fs_type)
 {
+
     // Validate input parameters
     if (!source)
     {
