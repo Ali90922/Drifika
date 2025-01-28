@@ -34,6 +34,19 @@ char *unicode2ascii(uint16_t *unicode_string, uint8_t length)
 
 /**
  * Mount the file system.
+ *  What Does nqp_mount Need to Do?
+ * 1. Open the file system image (a binary file representing an exFAT-formatted disk).
+ * 2. Read the Main Boot Record (MBR) from the first sector.
+ * 3. Validate the following fields:
+ *       File System Name (fs_name): Must be "EXFAT".
+         MustBeZero (must_be_zero): Must be all zero bytes.
+         First Cluster of Root Directory (first_cluster_of_root_directory): Must be ≥ 2 (since cluster numbers start at 2).
+
+   4. Perform additional sanity checks :
+       Ensure the Boot Signature (boot_signature) is 0xAA55.
+       Ensure the volume size is reasonable.
+       Ensure the FAT Table is properly located.
+
  */
 nqp_error nqp_mount(const char *source, nqp_fs_type fs_type)
 {
