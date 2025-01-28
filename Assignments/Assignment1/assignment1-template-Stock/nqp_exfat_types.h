@@ -11,8 +11,12 @@ typedef struct MAIN_BOOT_RECORD
     uint8_t must_be_zero[53];
     uint64_t partition_offset;
     uint64_t volume_length;
+
+    // The Fat Offset basically stores the location of the Fat Table
     uint32_t fat_offset;
+    // The fat Length stores the length of the Fat table in terms of numbers of Sectors which it Spans
     uint32_t fat_length;
+
     uint32_t cluster_heap_offset;
     uint32_t cluster_count;
     uint32_t first_cluster_of_root_directory;
@@ -161,3 +165,6 @@ typedef struct ENTRY_SET
 //  uint8_t bytes_per_sector_shift;
 // Defines the size of a cluster as 2^n Sectors
 // uint8_t sectors_per_cluster_shift;
+
+// Directory Entries as the metadata about a file or directory,
+// and the FAT table as the map that tracks where the actual data resides in the Cluster Heap
