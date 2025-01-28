@@ -156,3 +156,8 @@ typedef struct ENTRY_SET
 #define DENTRY_TYPE_END 0x00
 
 // Structure Exaplined
+
+// Defines the size of a sector as 2^n bytes
+//  uint8_t bytes_per_sector_shift;
+// Defines the size of a cluster as 2^n Sectors
+// uint8_t sectors_per_cluster_shift;
