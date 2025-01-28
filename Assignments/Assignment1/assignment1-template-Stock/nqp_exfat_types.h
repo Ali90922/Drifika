@@ -19,8 +19,12 @@ typedef struct MAIN_BOOT_RECORD
     uint32_t volume_serial_number;
     uint16_t fs_revision;
     uint16_t fs_flags;
+
+    // Defines the size of a sector as 2^n bytes
     uint8_t bytes_per_sector_shift;
+    // Defines the size of a cluster as 2^n Sectors
     uint8_t sectors_per_cluster_shift;
+
     uint8_t number_of_fats;
     uint8_t drive_select;
     uint8_t percent_in_use;
