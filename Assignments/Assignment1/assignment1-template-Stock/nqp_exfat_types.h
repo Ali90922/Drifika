@@ -178,3 +178,35 @@ typedef struct ENTRY_SET
 // Directory Entries store file names and metadata.
 // They contain file size, timestamps, attributes, and the first cluster number of the file.
 // Stored inside the Cluster Heap at the root directory’s first cluster (or within a subdirectory’s cluster if it's not the root).
+
+/*
+
+The FAT Table (File Allocation Table) is a map that tracks which clusters are used in the Cluster Heap and how they are linked.
+✅ What is Stored in the FAT Table?
+Cluster status: Whether a cluster is used, free, or the end of a file.
+Cluster linking: The next cluster in a file’s chain (if the file spans multiple clusters).
+End-of-File markers (EOF): Indicates the last cluster of a file.
+🚫 What is NOT Stored in the FAT Table?
+File names
+Metadata (timestamps, attributes, file size, etc.)
+Directory structure or hierarchy
+
+*/
+
+/*
+3. Where Are Directory Entries Stored?
+Directory Entries ARE NOT in the FAT Table.
+They are stored in the Cluster Heap, inside the first cluster of the root directory.
+Directory Entries are Stored in:
+Root Directory’s First Cluster (for files & subdirectories in the root).
+Subdirectory’s First Cluster (for files inside a subdirectory).
+Additional Clusters (if needed), linked via FAT.
+
+✅ What Directory Entries Store:
+File Name (stored in Unicode).
+File Attributes (read-only, hidden, system, etc.).
+Timestamps (creation, modification, access).
+File Size (for files).
+First Cluster Number (where the file’s data begins in the Cluster Heap).
+
+*/
