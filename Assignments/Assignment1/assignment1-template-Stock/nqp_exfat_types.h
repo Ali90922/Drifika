@@ -172,3 +172,9 @@ typedef struct ENTRY_SET
 
 // Directory Entries as the metadata about a file or directory,
 // and the FAT table as the map that tracks where the actual data resides in the Cluster Heap
+
+// The FAT Table does NOT store file names or metadata.
+// It only tracks which clusters are used and how they are linked (like a linked list for file storage).
+// Directory Entries store file names and metadata.
+// They contain file size, timestamps, attributes, and the first cluster number of the file.
+// Stored inside the Cluster Heap at the root directory’s first cluster (or within a subdirectory’s cluster if it's not the root).
