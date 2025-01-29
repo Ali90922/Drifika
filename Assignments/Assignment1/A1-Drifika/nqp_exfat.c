@@ -47,6 +47,14 @@ char *unicode2ascii(uint16_t *unicode_string, uint8_t length)
        Ensure the volume size is reasonable.
        Ensure the FAT Table is properly located.
 
+
+       // Just do these things for full marks :
+       Specifically checks the following fields for validity
+
+        FileSystemName
+        MustBeZero
+F       FirstClusterOfRootDirectory
+
  */
 nqp_error nqp_mount(const char *source, nqp_fs_type fs_type)
 {
@@ -82,6 +90,21 @@ nqp_error nqp_mount(const char *source, nqp_fs_type fs_type)
         fclose(fs_image);
         fs_image = NULL;
         return NQP_FSCK_FAIL;
+    }
+
+    // Check the Must be zero thing
+    // The must_be_zero field in the exFAT Main Boot Record is a section of 53 bytes that must be entirely zero.
+    // If any byte in this field is non-zero, the file system is considered corrupt.
+    // Validate must_be_zero field (Ensure all 53 bytes are zero)
+    for (size_t i = 0; i < sizeof(mbr.must_be_zero); i++)
+    {
+        if (mbr.must_be_zero[i] != 0)
+        { // If any byte is non-zero, the file system is corrupt
+            printf("ERROR: must_be_zero field is not all zero!\n");
+            fclose(fs_image);
+            fs_image = NULL;
+            return NQP_FSCK_FAIL;
+        }
     }
 
     // Set the mounted state
