@@ -168,11 +168,21 @@ int nqp_open(const char *pathname)
         return -1;
     }
 
-    // For simplicity, we only search the root directory in this example.
-    // Locate the file in the directory structure (not fully implemented here).
+    uint32_t current_cluster = mbr.first_cluster_of_root_directory;
+    uint32_t file_cluster = 0;
+    uint64_t file_size = 0;
 
-    // Placeholder: file found successfully
-    return 0; // File descriptor (e.g., an index in an open file table)
+    size_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift);
+
+    uint8_t *cluster_buffer = malloc(cluster_size);
+
+    if (!cluster_buffer)
+        return -1;
+
+    // Tokenize path for directory traversal
+    char path_copy[256];
+    strncpy(path_copy, pathname, sizeof(path_copy));
+    char *token = strtok(path_copy, "/");
 }
 
 /**
