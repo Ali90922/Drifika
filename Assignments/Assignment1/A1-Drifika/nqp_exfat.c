@@ -1,0 +1,165 @@
+#include <assert.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "nqp_io.h"
+#include "nqp_exfat_types.h"
+
+// Global state for the mounted file system
+static FILE *fs_image = NULL; // File pointer for the file system image
+static int is_mounted = 0;    // Flag to indicate if the FS is mounted
+static main_boot_record mbr;  // Stores the Main Boot Record data
+
+/**
+ * Convert a Unicode-formatted string containing only ASCII characters
+ * into a regular ASCII-formatted string (16-bit chars to 8-bit chars).
+ */
+char *unicode2ascii(uint16_t *unicode_string, uint8_t length)
+{
+    assert(unicode_string != NULL);
+    assert(length > 0);
+
+    char *ascii_string = calloc(length + 1, sizeof(char)); // Allocate memory for ASCII string
+    if (ascii_string)
+    {
+        for (uint8_t i = 0; i < length; i++)
+        {
+            ascii_string[i] = (char)(unicode_string[i] & 0xFF); // Strip the top 8 bits
+        }
+        ascii_string[length] = '\0'; // Null-terminate the string
+    }
+    return ascii_string;
+}
+
+/**
+ * Mount the file system.
+ *  What Does nqp_mount Need to Do?
+ * 1. Open the file system image (a binary file representing an exFAT-formatted disk).
+ * 2. Read the Main Boot Record (MBR) from the first sector.
+ * 3. Validate the following fields:
+ *       File System Name (fs_name): Must be "EXFAT".
+         MustBeZero (must_be_zero): Must be all zero bytes.
+         First Cluster of Root Directory (first_cluster_of_root_directory): Must be ≥ 2 (since cluster numbers start at 2).
+
+   4. Perform additional sanity checks :
+       Ensure the Boot Signature (boot_signature) is 0xAA55.
+       Ensure the volume size is reasonable.
+       Ensure the FAT Table is properly located.
+
+ */
+nqp_error nqp_mount(const char *source, nqp_fs_type fs_type)
+{
+
+    // Validate input parameters
+    if (!source)
+    {
+        return NQP_INVAL;
+    }
+    if (fs_type != NQP_FS_EXFAT)
+    {
+        return NQP_UNSUPPORTED_FS;
+    }
+
+    // Open the file system image
+    fs_image = fopen(source, "rb");
+    if (!fs_image)
+    {
+        return NQP_INVAL;
+    }
+
+    // Read the Main Boot Record
+    if (fread(&mbr, sizeof(main_boot_record), 1, fs_image) != 1)
+    {
+        fclose(fs_image);
+        fs_image = NULL;
+        return NQP_FSCK_FAIL;
+    }
+
+    // Validate the file system name and boot signature
+    if (strncmp(mbr.fs_name, "EXFAT   ", 8) != 0 || mbr.boot_signature != 0xAA55)
+    {
+        fclose(fs_image);
+        fs_image = NULL;
+        return NQP_FSCK_FAIL;
+    }
+
+    // Set the mounted state
+    is_mounted = 1;
+    return NQP_OK;
+}
+
+/**
+ * Unmount the file system.
+ */
+nqp_error nqp_unmount(void)
+{
+    if (!is_mounted || !fs_image)
+    {
+        return NQP_INVAL;
+    }
+    fclose(fs_image);
+    fs_image = NULL;
+    is_mounted = 0;
+    return NQP_OK;
+}
+
+/**
+ * Open a file in the mounted file system.
+ */
+int nqp_open(const char *pathname)
+{
+    if (!is_mounted || !pathname)
+    {
+        return -1;
+    }
+
+    // For simplicity, we only search the root directory in this example.
+    // Locate the file in the directory structure (not fully implemented here).
+
+    // Placeholder: file found successfully
+    return 0; // File descriptor (e.g., an index in an open file table)
+}
+
+/**
+ * Close the file referred to by the descriptor.
+ */
+int nqp_close(int fd)
+{
+    if (!is_mounted || fd < 0)
+    {
+        return -1;
+    }
+
+    // Placeholder: Close the file (not fully implemented)
+    return 0;
+}
+
+/**
+ * Read data from a file.
+ */
+ssize_t nqp_read(int fd, void *buffer, size_t count)
+{
+    if (!is_mounted || fd < 0 || !buffer || count == 0)
+    {
+        return -1;
+    }
+
+    // Placeholder: Read data from the file (not fully implemented)
+    size_t bytes_read = 0; // Replace with actual read logic
+    return bytes_read;
+}
+
+/**
+ * Get directory entries for a directory.
+ */
+ssize_t nqp_getdents(int fd, void *dirp, size_t count)
+{
+    if (!is_mounted || fd < 0 || !dirp || count < sizeof(nqp_dirent))
+    {
+        return -1;
+    }
+
+    // Placeholder: Retrieve directory entries (not fully implemented)
+    return 0; // Return total bytes written to the buffer
+}
