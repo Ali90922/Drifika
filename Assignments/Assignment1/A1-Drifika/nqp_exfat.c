@@ -107,6 +107,17 @@ nqp_error nqp_mount(const char *source, nqp_fs_type fs_type)
         }
     }
 
+    // Validate FirstClusterOfRootDirectory
+
+    // Validate `first_cluster_of_root_directory`
+    if (mbr.first_cluster_of_root_directory < 2)
+    {
+        printf("ERROR: Invalid FirstClusterOfRootDirectory: %u\n", mbr.first_cluster_of_root_directory);
+        fclose(fs_image);
+        fs_image = NULL;
+        return NQP_FSCK_FAIL;
+    }
+
     // Set the mounted state
     is_mounted = 1;
     return NQP_OK;
