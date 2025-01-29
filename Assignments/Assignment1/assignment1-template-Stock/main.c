@@ -3,7 +3,10 @@
 #include <string.h>
 #include "nqp_io.h"
 
-void print_menu()
+// Function prototype declaration
+void print_menu(void);
+
+void print_menu(void)
 {
     printf("\nCommands:\n");
     printf("  mount <fs_image>  - Mount an exFAT file system\n");
@@ -15,10 +18,10 @@ void print_menu()
     printf("  exit              - Exit the program\n");
 }
 
-int main()
+int main(void)
 {
     char command[256];
-    char arg1[128], arg2[128];
+    char arg1[128]; // Removed unused variable `arg2`
     int fd;
     size_t count;
     char buffer[1024]; // For reading file data
@@ -35,67 +38,97 @@ int main()
 
         if (strncmp(command, "mount", 5) == 0)
         {
-            sscanf(command, "mount %s", arg1);
-            status = nqp_mount(arg1, NQP_FS_EXFAT);
-            if (status == NQP_OK)
+            if (sscanf(command, "mount %127s", arg1) == 1) // Prevent buffer overflow
             {
-                printf("Mounted successfully!\n");
+                status = nqp_mount(arg1, NQP_FS_EXFAT);
+                if (status == NQP_OK)
+                {
+                    printf("Mounted successfully!\n");
+                }
+                else
+                {
+                    printf("Mount failed! Error: %d\n", status);
+                }
             }
             else
             {
-                printf("Mount failed! Error: %d\n", status);
+                printf("Invalid command format. Usage: mount <fs_image>\n");
             }
         }
         else if (strncmp(command, "open", 4) == 0)
         {
-            sscanf(command, "open %s", arg1);
-            fd = nqp_open(arg1);
-            if (fd >= 0)
+            if (sscanf(command, "open %127s", arg1) == 1)
             {
-                printf("Opened file '%s', fd=%d\n", arg1, fd);
+                fd = nqp_open(arg1);
+                if (fd >= 0)
+                {
+                    printf("Opened file '%s', fd=%d\n", arg1, fd);
+                }
+                else
+                {
+                    printf("Failed to open file '%s'\n", arg1);
+                }
             }
             else
             {
-                printf("Failed to open file '%s'\n", arg1);
+                printf("Invalid command format. Usage: open <filename>\n");
             }
         }
         else if (strncmp(command, "read", 4) == 0)
         {
-            sscanf(command, "read %d %zu", &fd, &count);
-            ssize_t bytes = nqp_read(fd, buffer, count);
-            if (bytes > 0)
+            if (sscanf(command, "read %d %zu", &fd, &count) == 2)
             {
-                buffer[bytes] = '\0';
-                printf("Read %zd bytes: %s\n", bytes, buffer);
+                ssize_t bytes = nqp_read(fd, buffer, count);
+                if (bytes > 0)
+                {
+                    buffer[bytes] = '\0';
+                    printf("Read %zd bytes: %s\n", bytes, buffer);
+                }
+                else
+                {
+                    printf("Failed to read from fd=%d\n", fd);
+                }
             }
             else
             {
-                printf("Failed to read from fd=%d\n", fd);
+                printf("Invalid command format. Usage: read <fd> <size>\n");
             }
         }
         else if (strncmp(command, "getdents", 8) == 0)
         {
-            sscanf(command, "getdents %d %zu", &fd, &count);
-            ssize_t bytes = nqp_getdents(fd, buffer, count);
-            if (bytes > 0)
+            if (sscanf(command, "getdents %d %zu", &fd, &count) == 2)
             {
-                printf("Read %zd bytes from directory fd=%d\n", bytes, fd);
+                ssize_t bytes = nqp_getdents(fd, buffer, count);
+                if (bytes > 0)
+                {
+                    printf("Read %zd bytes from directory fd=%d\n", bytes, fd);
+                }
+                else
+                {
+                    printf("Failed to list directory entries\n");
+                }
             }
             else
             {
-                printf("Failed to list directory entries\n");
+                printf("Invalid command format. Usage: getdents <fd> <size>\n");
             }
         }
         else if (strncmp(command, "close", 5) == 0)
         {
-            sscanf(command, "close %d", &fd);
-            if (nqp_close(fd) == 0)
+            if (sscanf(command, "close %d", &fd) == 1)
             {
-                printf("Closed file descriptor %d\n", fd);
+                if (nqp_close(fd) == 0)
+                {
+                    printf("Closed file descriptor %d\n", fd);
+                }
+                else
+                {
+                    printf("Failed to close fd=%d\n", fd);
+                }
             }
             else
             {
-                printf("Failed to close fd=%d\n", fd);
+                printf("Invalid command format. Usage: close <fd>\n");
             }
         }
         else if (strncmp(command, "unmount", 7) == 0)

@@ -1,25 +1,41 @@
 # COMP 3430 Operating Systems
 # Winter 2025
 # Franklin Bristow
-#
-# Students registered in this offering of the course are explicitly permitted
-# to copy and use this Makefile for their own work.
 
 CC = clang
 CFLAGS = -Wall -Werror -Wextra -Wpedantic -g -D_FORTIFY_SOURCE=3
 
-# make USE_LIBC_INSTEAD=1 
+# Enable optional compilation flag
 ifdef USE_LIBC_INSTEAD
 	CFLAGS := -DUSE_LIBC_INSTEAD $(CFLAGS)
 endif
 
-.PHONY: clean
+# Define object files
+OBJS = nqp_exfat.o
 
-all: cat
+# Default target: Build everything
+.PHONY: all clean
 
-ifndef USE_LIBC_INSTEAD
-cat: nqp_exfat.o
-endif
+all: main cat
 
+# Compile main.c (test program)
+main: main.o $(OBJS)
+	$(CC) $(CFLAGS) -o main main.o $(OBJS)
+
+# Compile cat.c (existing program)
+cat: cat.o $(OBJS)
+	$(CC) $(CFLAGS) -o cat cat.o $(OBJS)
+
+# Compile object files
+main.o: main.c nqp_exfat_types.h
+	$(CC) $(CFLAGS) -c main.c
+
+nqp_exfat.o: nqp_exfat.c nqp_exfat_types.h
+	$(CC) $(CFLAGS) -c nqp_exfat.c
+
+cat.o: cat.c
+	$(CC) $(CFLAGS) -c cat.c
+
+# Clean up compiled files
 clean:
-	rm -rf cat *.o
+	rm -rf main cat *.o
