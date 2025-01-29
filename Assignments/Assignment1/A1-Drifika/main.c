@@ -40,6 +40,7 @@ int main(void)
         {
             if (sscanf(command, "mount %127s", arg1) == 1) // Prevent buffer overflow
             {
+                // status calls are function implemenation -- in the nqp_exfat.c file
                 status = nqp_mount(arg1, NQP_FS_EXFAT);
                 if (status == NQP_OK)
                 {

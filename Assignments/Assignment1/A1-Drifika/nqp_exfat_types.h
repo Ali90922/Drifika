@@ -8,7 +8,10 @@ typedef struct MAIN_BOOT_RECORD
 {
     uint8_t jump_boot[3];
     char fs_name[8];
+
+    // These 53 bytes must be zero -- otherwise the image is corrupt -- and I have to check this condition in the Mount function
     uint8_t must_be_zero[53];
+
     uint64_t partition_offset;
     uint64_t volume_length;
 
@@ -38,6 +41,8 @@ typedef struct MAIN_BOOT_RECORD
     uint8_t percent_in_use;
     uint8_t reserved[7];
     uint8_t bootcode[390];
+
+    // have to check this field when mounting --
     uint16_t boot_signature;
 } main_boot_record;
 #pragma pack(pop)
