@@ -126,6 +126,16 @@ nqp_error nqp_mount(const char *source, nqp_fs_type fs_type)
 /**
  * Unmount the file system.
  */
+
+/**
+ * "Unmount" the mounted file system.
+ *
+ * This function should be called to flush any changes to the file system's
+ * volume (there shouldn't be! All operations are read only.)
+ *
+ * Return: NQP_INVAL on error (e.g., there is no fs currently mounted) or
+ *         NQP_OK on success.
+ */
 nqp_error nqp_unmount(void)
 {
     if (!is_mounted || !fs_image)
@@ -140,6 +150,16 @@ nqp_error nqp_unmount(void)
 
 /**
  * Open a file in the mounted file system.
+ */
+
+/**
+ * Open the file at pathname in the "mounted" file system.
+ *
+ * Parameters:
+ *  * pathname: The path of the file or directory in the file system that
+ *              should be opened.  Must not be NULL.
+ * Return: -1 on error, or a nonnegative integer on success. The nonnegative
+ *         integer is a file descriptor.
  */
 int nqp_open(const char *pathname)
 {
