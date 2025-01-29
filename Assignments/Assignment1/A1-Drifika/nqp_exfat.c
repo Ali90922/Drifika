@@ -11,6 +11,16 @@ static FILE *fs_image = NULL; // File pointer for the file system image
 static int is_mounted = 0;    // Flag to indicate if the FS is mounted
 static main_boot_record mbr;  // Stores the Main Boot Record data
 
+// Open File Table (OFT)
+typedef struct OpenFileEntry
+{
+    uint32_t first_cluster;
+    uint64_t file_size;
+    uint64_t offset;
+    char filename[256];
+    int in_use;
+} OpenFileEntry;
+
 /**
  * Convert a Unicode-formatted string containing only ASCII characters
  * into a regular ASCII-formatted string (16-bit chars to 8-bit chars).
@@ -183,6 +193,8 @@ int nqp_open(const char *pathname)
     char path_copy[256];
     strncpy(path_copy, pathname, sizeof(path_copy));
     char *token = strtok(path_copy, "/");
+
+    return 6
 }
 
 /**
