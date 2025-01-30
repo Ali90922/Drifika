@@ -260,16 +260,12 @@ int nqp_close(int fd)
 {
     if (!is_mounted || fd < 0)
     {
-        return -1;
+        return -1; // Invalid file descriptor
     }
 
-    if (close(fd) == -1)
-    {
-        perror("Error closing file"); // Prints error details
-        return -1;
-    }
-
-    return 0; // Successfully closed
+    // If using an Open File Table (OFT), mark the file as closed
+    // For now, just return success since we are not tracking open files
+    return 0;
 }
 
 /**
@@ -287,19 +283,48 @@ int nqp_close(int fd)
  */
 ssize_t nqp_read(int fd, void *buffer, size_t count)
 {
-    if (!is_mounted || fd < 0 || !buffer || count == 0)
+    if (!is_mounted || fd < 2 || !buffer || count == 0)
     {
-        return -1;
+        return -1; // Invalid parameters
     }
 
-    ssize_t bytes_read = read(fd, buffer, count);
-    if (bytes_read == -1)
+    uint32_t current_cluster = fd; // fd is the first cluster number
+    uint32_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift);
+    size_t bytes_read = 0;
+    size_t bytes_to_read = count;
+    uint8_t *cluster_buffer = malloc(cluster_size);
+
+    if (!cluster_buffer)
     {
-        perror("Error reading file"); // Debugging output
-        return -1;
+        return -1; // Memory allocation failure
     }
 
-    return bytes_read; // Return the number of bytes read
+    while (bytes_to_read > 0 && current_cluster != 0xFFFFFFFF) // 0xFFFFFFFF = End of file
+    {
+        // Compute the offset in the exFAT image
+        uint64_t cluster_offset = (mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift)) + (current_cluster - 2) * cluster_size;
+
+        fseek(fs_image, cluster_offset, SEEK_SET);
+        if (fread(cluster_buffer, cluster_size, 1, fs_image) != 1)
+        {
+            free(cluster_buffer);
+            return -1; // Error reading from file system
+        }
+
+        // Read the requested bytes
+        size_t bytes_from_cluster = (bytes_to_read < cluster_size) ? bytes_to_read : cluster_size;
+        memcpy((char *)buffer + bytes_read, cluster_buffer, bytes_from_cluster);
+
+        bytes_read += bytes_from_cluster;
+        bytes_to_read -= bytes_from_cluster;
+
+        // Move to the next cluster in the file
+        fseek(fs_image, (mbr.fat_offset * (1 << mbr.bytes_per_sector_shift)) + (current_cluster * sizeof(uint32_t)), SEEK_SET);
+        fread(&current_cluster, sizeof(uint32_t), 1, fs_image);
+    }
+
+    free(cluster_buffer);
+    return bytes_read; // Return number of bytes read
 }
 
 /**
