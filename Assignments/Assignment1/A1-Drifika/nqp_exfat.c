@@ -365,4 +365,5 @@ ssize_t nqp_getdents(int fd, void *dirp, size_t count)
 
 // Problems :
 
-// 1. Problems while accessing/ opening/ reading Nested Files -- Fix it !
+// 1. Problems while accessing/ opening/ reading Nested Files -- Fix it -- Problem Fixed
+// Above Problem is with not having the appropriate file extensions -- properly name ur files like .md or .txt extensions
