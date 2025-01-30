@@ -275,6 +275,16 @@ int nqp_close(int fd)
 /**
  * Read data from a file.
  */
+/**
+ * Read from a file desriptor.
+ *
+ * Parameters:
+ *  * fd: The file descriptor to read from. Must be a nonnegative integer. The
+ *        file descriptor should refer to a file, not a directory.
+ *  * buffer: The buffer to read data into. Must not be NULL.
+ *  * count: The number of bytes to read into the buffer.
+ * Return: The number of bytes read, 0 at the end of the file, or -1 on error.
+ */
 ssize_t nqp_read(int fd, void *buffer, size_t count)
 {
     if (!is_mounted || fd < 0 || !buffer || count == 0)
@@ -282,13 +292,32 @@ ssize_t nqp_read(int fd, void *buffer, size_t count)
         return -1;
     }
 
-    // Placeholder: Read data from the file (not fully implemented)
-    size_t bytes_read = 0; // Replace with actual read logic
-    return bytes_read;
+    ssize_t bytes_read = read(fd, buffer, count);
+    if (bytes_read == -1)
+    {
+        perror("Error reading file"); // Debugging output
+        return -1;
+    }
+
+    return bytes_read; // Return the number of bytes read
 }
 
 /**
  * Get directory entries for a directory.
+ */
+
+/**
+ * Get the directory entries for a directory. Similar to read()ing a file, you
+ * may need to call this function repeatedly to get all directory entries.
+ *
+ * Parameters:
+ *  * fd: The file descriptor to read from. Must be a nonnegative integer. The
+ *        file descriptor should refer to a directory, not a file.
+ *  * dirp: the buffer into which the directory entries will be written. The
+ *          buffer must not be NULL.
+ *  * count: the size of the buffer. Must be at least sizeof(nqp_dirent).
+ * Return: The total number of bytes read into the buffer, 0 at the end of the
+ * directory, or -1 on error.
  */
 ssize_t nqp_getdents(int fd, void *dirp, size_t count)
 {
