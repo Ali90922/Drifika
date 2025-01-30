@@ -3,8 +3,8 @@
 #include <string.h>
 #include "nqp_io.h"
 
-// Function prototype declaration
 void print_menu(void);
+void list_img_files(void);
 
 void print_menu(void)
 {
@@ -18,29 +18,36 @@ void print_menu(void)
     printf("  exit              - Exit the program\n");
 }
 
+// Function to list .img files without including dirent.h
+void list_img_files(void)
+{
+    printf("\nAvailable .img files:\n");
+    system("ls *.img 2>/dev/null || echo '  No .img files found.'");
+}
+
 int main(void)
 {
     char command[256];
-    char arg1[128]; // Removed unused variable `arg2`
+    char arg1[128];
     int fd;
     size_t count;
-    char buffer[1024]; // For reading file data
+    char buffer[1024];
     nqp_error status;
 
     printf("Welcome to exFAT CLI Tester\n");
+    list_img_files(); // Show available .img files
     print_menu();
 
     while (1)
     {
         printf("\n> ");
         fgets(command, sizeof(command), stdin);
-        command[strcspn(command, "\n")] = 0; // Remove newline
+        command[strcspn(command, "\n")] = 0;
 
         if (strncmp(command, "mount", 5) == 0)
         {
-            if (sscanf(command, "mount %127s", arg1) == 1) // Prevent buffer overflow
+            if (sscanf(command, "mount %127s", arg1) == 1)
             {
-                // status calls are function implemenation -- in the nqp_exfat.c file
                 status = nqp_mount(arg1, NQP_FS_EXFAT);
                 if (status == NQP_OK)
                 {
@@ -153,6 +160,7 @@ int main(void)
         {
             printf("Unknown command.\n");
             print_menu();
+            list_img_files(); // Re-list available .img files for user reference
         }
     }
     return 0;
