@@ -291,9 +291,10 @@ ssize_t nqp_read(int fd, void *buffer, size_t count)
     uint32_t current_cluster = fd; // fd is the first cluster number
 
     // The left shift in the single bit is to raise the value to the power of 2 :
-    uint32_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift);
+    uint32_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift); // Total bytes per cluster
 
     size_t bytes_read = 0;
+
     size_t bytes_to_read = count;
     uint8_t *cluster_buffer = malloc(cluster_size);
 
@@ -306,6 +307,10 @@ ssize_t nqp_read(int fd, void *buffer, size_t count)
     {
         // Compute the offset in the exFAT image
         uint64_t cluster_offset = (mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift)) + (current_cluster - 2) * cluster_size;
+
+        // cluster_heap_offset is the start location of the file data in the exFAT
+        // current_cluster - 2 is there to convert the cluster number to index - since cluster numbers start from 2.
+        // So the final offset being calculated is : (Start of Cluster Heap) + (Offset of current cluster)
 
         fseek(fs_image, cluster_offset, SEEK_SET);
         if (fread(cluster_buffer, cluster_size, 1, fs_image) != 1)
