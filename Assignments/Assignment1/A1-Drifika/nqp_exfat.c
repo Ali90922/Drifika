@@ -362,3 +362,7 @@ ssize_t nqp_getdents(int fd, void *dirp, size_t count)
     // Placeholder: Retrieve directory entries (not fully implemented)
     return 0; // Return total bytes written to the buffer
 }
+
+// Problems :
+
+// 1. Problems while accessing/ opening/ reading Nested Files -- Fix it !
