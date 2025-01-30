@@ -289,7 +289,10 @@ ssize_t nqp_read(int fd, void *buffer, size_t count)
     }
 
     uint32_t current_cluster = fd; // fd is the first cluster number
+
+    // The left shift in the single bit is to raise the value to the power of 2 :
     uint32_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift);
+
     size_t bytes_read = 0;
     size_t bytes_to_read = count;
     uint8_t *cluster_buffer = malloc(cluster_size);
