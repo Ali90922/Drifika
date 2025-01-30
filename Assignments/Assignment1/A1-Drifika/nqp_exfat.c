@@ -212,7 +212,6 @@ int nqp_open(const char *pathname)
                         modify_time = entry[i].file.last_modified_timestamp;
                         access_time = entry[i].file.last_accessed_timestamp;
 
-                        // ✅ Print file metadata
                         printf("\nOpened file: %s\n", pathname);
                         printf("File Descriptor (First Cluster): %u\n", file_cluster);
                         printf("File Size: %llu bytes\n", (unsigned long long)file_size);
@@ -252,6 +251,10 @@ int nqp_open(const char *pathname)
 
 /**
  * Close the file referred to by the descriptor.
+ *
+ * Parameters:
+ *  * fd: The file descriptor to close. Must be a nonnegative integer.
+ * Return: -1 on error or 0 on success.
  */
 int nqp_close(int fd)
 {
