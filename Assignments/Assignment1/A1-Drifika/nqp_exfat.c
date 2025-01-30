@@ -263,8 +263,13 @@ int nqp_close(int fd)
         return -1;
     }
 
-    // Placeholder: Close the file (not fully implemented)
-    return 0;
+    if (close(fd) == -1)
+    {
+        perror("Error closing file"); // Prints error details
+        return -1;
+    }
+
+    return 0; // Successfully closed
 }
 
 /**
