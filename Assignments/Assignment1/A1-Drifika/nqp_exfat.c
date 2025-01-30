@@ -167,7 +167,10 @@ int nqp_open(const char *pathname)
         return -1;
 
     uint32_t current_cluster = mbr.first_cluster_of_root_directory;
-    uint32_t file_cluster = 0; // We only need to track the first cluster
+    uint32_t file_cluster = 0;
+    uint64_t file_size = 0;
+    uint32_t create_time, modify_time, access_time;
+    uint16_t file_attributes;
 
     size_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift);
     uint8_t *cluster_buffer = malloc(cluster_size);
@@ -197,12 +200,25 @@ int nqp_open(const char *pathname)
             directory_entry *entry = (directory_entry *)cluster_buffer;
             for (size_t i = 0; i < cluster_size / sizeof(directory_entry); i++)
             {
-                if (entry[i].entry_type == DENTRY_TYPE_FILE || entry[i].entry_type == DENTRY_TYPE_STREAM_EXTENSION)
+                if (entry[i].entry_type == DENTRY_TYPE_FILE)
                 {
                     char *ascii_filename = unicode2ascii(entry[i + 2].file_name.file_name, 15);
                     if (ascii_filename && strcmp(ascii_filename, token) == 0)
                     {
                         file_cluster = entry[i + 1].stream_extension.first_cluster;
+                        file_size = entry[i + 1].stream_extension.data_length;
+                        file_attributes = entry[i].file.file_attributes;
+                        create_time = entry[i].file.create_timestamp;
+                        modify_time = entry[i].file.last_modified_timestamp;
+                        access_time = entry[i].file.last_accessed_timestamp;
+
+                        // ✅ Print file metadata
+                        printf("\nOpened file: %s\n", pathname);
+                        printf("File Descriptor (First Cluster): %u\n", file_cluster);
+                        printf("File Size: %llu bytes\n", (unsigned long long)file_size);
+                        printf("File Attributes: 0x%X\n", file_attributes);
+                        printf("Created: %u, Modified: %u, Accessed: %u\n", create_time, modify_time, access_time);
+
                         free(ascii_filename);
                         found = 1;
                         break;
