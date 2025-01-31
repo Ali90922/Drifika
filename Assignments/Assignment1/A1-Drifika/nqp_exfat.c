@@ -354,13 +354,74 @@ ssize_t nqp_read(int fd, void *buffer, size_t count)
  */
 ssize_t nqp_getdents(int fd, void *dirp, size_t count)
 {
-    if (!is_mounted || fd < 0 || !dirp || count < sizeof(nqp_dirent))
+    if (!is_mounted || fd < 2 || !dirp || count < sizeof(nqp_dirent))
     {
-        return -1;
+        return -1; // Invalid input parameters
     }
 
-    // Placeholder: Retrieve directory entries (not fully implemented)
-    return 0; // Return total bytes written to the buffer
+    uint32_t current_cluster = fd; // The file descriptor represents the starting cluster of the directory
+    uint32_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift);
+    uint8_t *cluster_buffer = malloc(cluster_size);
+
+    if (!cluster_buffer)
+    {
+        return -1; // Memory allocation failure
+    }
+
+    size_t bytes_written = 0;
+    nqp_dirent *dir_entries = (nqp_dirent *)dirp;
+
+    while (current_cluster != 0xFFFFFFFF) // End of directory marker in FAT
+    {
+        // Compute the location of the cluster in the file system
+        uint64_t cluster_offset = (mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift)) + (current_cluster - 2) * cluster_size;
+
+        fseek(fs_image, cluster_offset, SEEK_SET);
+        if (fread(cluster_buffer, cluster_size, 1, fs_image) != 1)
+        {
+            free(cluster_buffer);
+            return -1; // Error reading from the file system
+        }
+
+        directory_entry *entry = (directory_entry *)cluster_buffer;
+
+        for (size_t i = 0; i < cluster_size / sizeof(directory_entry); i++)
+        {
+            if (entry[i].entry_type == DENTRY_TYPE_FILE)
+            {
+                char *ascii_filename = unicode2ascii(entry[i + 2].file_name.file_name, 15);
+                if (!ascii_filename)
+                {
+                    continue;
+                }
+
+                // Copy directory entry information
+                strncpy(dir_entries->filename, ascii_filename, sizeof(dir_entries->filename));
+                dir_entries->file_size = (entry[i + 1].entry_type == DENTRY_TYPE_STREAM_EXTENSION) ? entry[i + 1].stream_extension.data_length : 0;
+                dir_entries->file_type = (entry[i].entry_type == DENTRY_TYPE_FILE) ? NQP_FILE : NQP_DIR;
+
+                // Move to the next entry in the buffer
+                dir_entries++;
+                bytes_written += sizeof(nqp_dirent);
+
+                free(ascii_filename);
+
+                // Stop if buffer is full
+                if (bytes_written + sizeof(nqp_dirent) > count)
+                {
+                    free(cluster_buffer);
+                    return bytes_written;
+                }
+            }
+        }
+
+        // Move to the next cluster in the directory using the FAT table
+        fseek(fs_image, (mbr.fat_offset * (1 << mbr.bytes_per_sector_shift)) + (current_cluster * sizeof(uint32_t)), SEEK_SET);
+        fread(&current_cluster, sizeof(uint32_t), 1, fs_image);
+    }
+
+    free(cluster_buffer);
+    return bytes_written; // Return total bytes written to the buffer
 }
 
 // Problems :

@@ -20,12 +20,16 @@ typedef struct MAIN_BOOT_RECORD
     // The fat Length stores the length of the Fat table in terms of numbers of Sectors which it Spans
     uint32_t fat_length;
 
+    // Cluster heap offset indicqates the location of the starting sector of the cluster heap.
     uint32_t cluster_heap_offset;
+
     uint32_t cluster_count;
 
     // first_cluster_of_root_directory: Points to the first cluster of the root directory in the Cluster Heap
     // The root directory contains directory entries for all files and subdirectories in the root
     uint32_t first_cluster_of_root_directory;
+
+    //  in some cases, cluster_heap_offset and first_cluster_of_root_directory could point to the same sector
 
     uint32_t volume_serial_number;
     uint16_t fs_revision;
