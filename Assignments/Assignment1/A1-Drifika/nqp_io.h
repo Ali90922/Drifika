@@ -23,6 +23,7 @@ typedef enum NQP_DIRECTORY_ENTRY_TYPE
     DT_REG, // a regular file
 } nqp_dtype;
 
+// This is the structure for the 5'th func
 typedef struct NQP_DIRECTORY_ENTRY
 {
     uint64_t inode_number; // the unique identifier for this entry

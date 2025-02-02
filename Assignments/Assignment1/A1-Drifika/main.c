@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "nqp_io.h"
+#include <inttypes.h>
 
 void print_menu(void);
 void list_img_files(void);
@@ -110,15 +111,26 @@ int main(void)
                 if (bytes > 0)
                 {
                     printf("Read %zd bytes from directory fd=%d\n", bytes, fd);
+
+                    // Cast the buffer to an array of nqp_dirent entries.
+                    nqp_dirent *entries = (nqp_dirent *)buffer;
+                    size_t num_entries = bytes / sizeof(nqp_dirent);
+
+                    // Print each directory entry.
+                    for (size_t i = 0; i < num_entries; i++)
+                    {
+                        printf("Entry %zu:\n", i);
+                        printf("  Inode: %" PRIu64 "\n", entries[i].inode_number);
+                        printf("  Name: %s\n", entries[i].name);
+                        printf("  Type: %s\n", (entries[i].type == DT_DIR) ? "Directory" : "Regular File");
+                        printf("  Name Length: %zu\n", entries[i].name_len);
+                    }
                 }
                 else
                 {
                     printf("Failed to list directory entries\n");
+                    printf("Value: %zd\n", bytes);
                 }
-            }
-            else
-            {
-                printf("Invalid command format. Usage: getdents <fd> <size>\n");
             }
         }
         else if (strncmp(command, "close", 5) == 0)
