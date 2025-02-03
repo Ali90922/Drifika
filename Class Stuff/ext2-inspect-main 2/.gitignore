@@ -1,0 +1,5 @@
+ext2-inspect
+ext2-inspect.dSYM
+*.swp
+ext2-fsck
+ext2-fsck.dSYM

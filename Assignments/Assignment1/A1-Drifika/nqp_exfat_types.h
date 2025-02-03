@@ -195,7 +195,7 @@ The FAT Table (File Allocation Table) is a map that tracks which clusters are us
 Cluster status: Whether a cluster is used, free, or the end of a file.
 Cluster linking: The next cluster in a file’s chain (if the file spans multiple clusters).
 End-of-File markers (EOF): Indicates the last cluster of a file.
-🚫 What is NOT Stored in the FAT Table?
+ What is NOT Stored in the FAT Table?
 File names
 Metadata (timestamps, attributes, file size, etc.)
 Directory structure or hierarchy
@@ -211,7 +211,7 @@ Root Directory’s First Cluster (for files & subdirectories in the root).
 Subdirectory’s First Cluster (for files inside a subdirectory).
 Additional Clusters (if needed), linked via FAT.
 
-✅ What Directory Entries Store:
+ What Directory Entries Store:
 File Name (stored in Unicode).
 File Attributes (read-only, hidden, system, etc.).
 Timestamps (creation, modification, access).
