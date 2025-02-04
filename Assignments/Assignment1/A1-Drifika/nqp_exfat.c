@@ -11,6 +11,16 @@ static FILE *fs_image = NULL; // File pointer for the file system image
 static int is_mounted = 0;    // Flag to indicate if the FS is mounted
 static main_boot_record mbr;  // Stores the Main Boot Record data
 
+typedef struct
+{
+    int in_use;
+    uint32_t start_cluster;
+    uint64_t file_size; // valid_data_length
+    uint64_t offset;    // current offset in the file
+} open_file_entry;
+
+#define MAX_OPEN_FILES 8
+open_file_entry open_files[MAX_OPEN_FILES];
 /**
  * Convert a Unicode-formatted string containing only ASCII characters
  * into a regular ASCII-formatted string (16-bit chars to 8-bit chars).
@@ -326,7 +336,7 @@ ssize_t nqp_read(int fd, void *buffer, size_t count)
         bytes_read += bytes_from_cluster;
         bytes_to_read -= bytes_from_cluster;
 
-                // Move to the next cluster in the file
+        // Move to the next cluster in the file
         fseek(fs_image, (mbr.fat_offset * (1 << mbr.bytes_per_sector_shift)) + (current_cluster * sizeof(uint32_t)), SEEK_SET);
         fread(&current_cluster, sizeof(uint32_t), 1, fs_image);
     }
