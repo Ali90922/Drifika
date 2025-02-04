@@ -22,7 +22,7 @@ all: main cat
 main: main.o $(OBJS)
 	$(CC) $(CFLAGS) -o main main.o $(OBJS)
 
-# Compile cat.c (existing program)
+# Compile cat.c (provided program to test the API)
 cat: cat.o $(OBJS)
 	$(CC) $(CFLAGS) -o cat cat.o $(OBJS)
 
@@ -33,7 +33,7 @@ main.o: main.c nqp_exfat_types.h
 nqp_exfat.o: nqp_exfat.c nqp_exfat_types.h
 	$(CC) $(CFLAGS) -c nqp_exfat.c
 
-cat.o: cat.c
+cat.o: cat.c nqp_io.h
 	$(CC) $(CFLAGS) -c cat.c
 
 # Clean up compiled files

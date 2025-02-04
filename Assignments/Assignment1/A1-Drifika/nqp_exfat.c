@@ -326,7 +326,7 @@ ssize_t nqp_read(int fd, void *buffer, size_t count)
         bytes_read += bytes_from_cluster;
         bytes_to_read -= bytes_from_cluster;
 
-        // Move to the next cluster in the file
+                // Move to the next cluster in the file
         fseek(fs_image, (mbr.fat_offset * (1 << mbr.bytes_per_sector_shift)) + (current_cluster * sizeof(uint32_t)), SEEK_SET);
         fread(&current_cluster, sizeof(uint32_t), 1, fs_image);
     }
