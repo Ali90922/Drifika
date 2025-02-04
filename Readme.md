@@ -16,3 +16,6 @@ Week 10: Virtual memory.
 Week 11: Memory segmentation.  
 Week 12: Paging (assignment 3 due).  
 Week 13: Swapping.
+
+
+ExFat OpenSource :  https://github.com/relan/exfat
