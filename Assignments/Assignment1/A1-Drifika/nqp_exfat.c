@@ -489,3 +489,12 @@ ssize_t nqp_getdents(int fd, void *dirp, size_t count)
 
 // 1. Problems while accessing/ opening/ reading Nested Files -- Fix it -- Problem Fixed
 // Above Problem is with not having the appropriate file extensions -- properly name ur files like .md or .txt extensions
+
+int nqp_size(int fd)
+{
+
+    // Calculate the Cluster Size
+    size_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift);
+
+    return 0;
+}
