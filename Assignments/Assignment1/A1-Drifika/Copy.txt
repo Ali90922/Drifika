@@ -1,0 +1,87 @@
+// int nqp_open(const char *pathname)
+//{
+if (!is_mounted || !pathname)
+    return -1;
+
+uint32_t current_cluster = mbr.first_cluster_of_root_directory;
+uint32_t file_cluster = 0;
+uint64_t file_size = 0;
+uint32_t create_time, modify_time, access_time;
+uint16_t file_attributes;
+
+size_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift);
+uint8_t *cluster_buffer = malloc(cluster_size);
+if (!cluster_buffer)
+    return -1;
+
+char path_copy[256];
+strncpy(path_copy, pathname, sizeof(path_copy));
+char *token = strtok(path_copy, "/");
+
+while (token != NULL)
+{
+    int found = 0;
+
+    while (current_cluster != 0xFFFFFFFF)
+    { // Traverse FAT chain
+        uint32_t cluster_offset = mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift);
+        uint64_t cluster_address = cluster_offset + (current_cluster - 2) * cluster_size;
+
+        fseek(fs_image, cluster_address, SEEK_SET);
+        if (fread(cluster_buffer, cluster_size, 1, fs_image) != 1)
+        {
+            free(cluster_buffer);
+            return -1;
+        }
+
+        directory_entry *entry = (directory_entry *)cluster_buffer;
+        for (size_t i = 0; i < cluster_size / sizeof(directory_entry); i++)
+        {
+            if (entry[i].entry_type == DENTRY_TYPE_FILE)
+            {
+                char *ascii_filename = unicode2ascii(entry[i + 2].file_name.file_name, 15);
+                if (ascii_filename && strcmp(ascii_filename, token) == 0)
+                {
+                    file_cluster = entry[i + 1].stream_extension.first_cluster;
+                    file_size = entry[i + 1].stream_extension.data_length;
+                    file_attributes = entry[i].file.file_attributes;
+                    create_time = entry[i].file.create_timestamp;
+                    modify_time = entry[i].file.last_modified_timestamp;
+                    access_time = entry[i].file.last_accessed_timestamp;
+
+                    printf("\nOpened file: %s\n", pathname);
+                    printf("File Descriptor (First Cluster): %u\n", file_cluster);
+                    printf("File Size: %llu bytes\n", (unsigned long long)file_size);
+                    printf("File Attributes: 0x%X\n", file_attributes);
+                    printf("Created: %u, Modified: %u, Accessed: %u\n", create_time, modify_time, access_time);
+
+                    free(ascii_filename);
+                    found = 1;
+                    break;
+                }
+                free(ascii_filename);
+            }
+        }
+
+        if (found)
+            break;
+
+        // Move to next cluster in the directory using the FAT table
+        fseek(fs_image, mbr.fat_offset * (1 << mbr.bytes_per_sector_shift) + current_cluster * sizeof(uint32_t), SEEK_SET);
+        fread(&current_cluster, sizeof(uint32_t), 1, fs_image);
+    }
+
+    if (!found)
+    {
+        free(cluster_buffer);
+        return -1; // File not found
+    }
+
+    token = strtok(NULL, "/");
+    if (token)
+        current_cluster = file_cluster;
+}
+
+free(cluster_buffer);
+return file_cluster; // Return first cluster as file descriptor
+//}
