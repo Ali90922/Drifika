@@ -490,7 +490,7 @@ ssize_t nqp_getdents(int fd, void *dirp, size_t count)
 // 1. Problems while accessing/ opening/ reading Nested Files -- Fix it -- Problem Fixed
 // Above Problem is with not having the appropriate file extensions -- properly name ur files like .md or .txt extensions
 
-int nqp_size(int fd)
+int nqp_size(void)
 {
 
     // Calculate the Cluster Size
@@ -502,11 +502,56 @@ int nqp_size(int fd)
         return -1;
     }
 
-    // uint32_t cluster_offset = mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift);
     // uint64_t cluster_address = cluster_offset + (fd - 2) * cluster_size;
     // directory_entry *entry = (directory_entry *)cluster_buffer;
 
     uint32_t root_cluster = mbr.first_cluster_of_root_directory;
+    uint32_t cluster_offset = mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift);
+    uint64_t cluster_address = cluster_offset + (root_cluster - 2) * cluster_size;
 
-    return fd + 0;
+    // Step 5: Seek to the Root Directory
+    if (fseek(fs_image, cluster_address, SEEK_SET) != 0)
+    {
+        perror("Error seeking to root directory cluster");
+        free(cluster_buffer);
+        return -1;
+    }
+
+    // Step 6: Read the Directory Cluster
+    size_t bytes_read = fread(cluster_buffer, 1, cluster_size, fs_image);
+    if (bytes_read != cluster_size)
+    {
+        perror("Error reading root directory cluster");
+        free(cluster_buffer);
+        return -1;
+    }
+
+    // Step 7: Scan Directory Entries for the File
+    directory_entry *entry = (directory_entry *)cluster_buffer;
+    stream_extension *stream_ext = NULL;
+
+    for (size_t i = 0; i < cluster_size / sizeof(directory_entry); i++)
+    {
+        if (entry[i].entry_type == DENTRY_TYPE_FILE) // Found file entry
+        {
+            // The Stream Extension entry follows immediately
+            stream_ext = (stream_extension *)&entry[i + 1];
+            break;
+        }
+    }
+
+    if (!stream_ext)
+    {
+        fprintf(stderr, "Error: Stream Extension not found\n");
+        free(cluster_buffer);
+        return -1;
+    }
+
+    // Step 8: Extract File Size
+    uint64_t file_size = stream_ext->data_length;
+
+    // Cleanup
+    free(cluster_buffer);
+
+    return (int)file_size;
 }
