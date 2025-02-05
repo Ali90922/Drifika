@@ -129,3 +129,69 @@ ssize_t nqp_read(int fd, void *buffer, size_t count)
     free(cluster_buffer);
     return bytes_read; // Return number of bytes read
 }
+
+// Incorrect Size Function :
+int nqp_size(int fd)
+{
+    // Step 1: Calculate Cluster Size
+    size_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift);
+
+    // Step 2: Allocate Buffer for Reading the Cluster
+    uint8_t *cluster_buffer = malloc(cluster_size);
+    if (!cluster_buffer)
+    {
+        return -1;
+    }
+
+    // Step 3: Locate Root Directory Cluster
+    uint32_t root_cluster = mbr.first_cluster_of_root_directory;
+
+    // Step 4: Compute Cluster Address for Directory Entries
+    uint32_t cluster_offset = mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift);
+    uint64_t cluster_address = cluster_offset + (root_cluster - 2) * cluster_size;
+
+    // Step 5: Seek to the Root Directory
+    if (fseek(fs_image, cluster_address, SEEK_SET) != 0)
+    {
+        perror("Error seeking to root directory cluster");
+        free(cluster_buffer);
+        return -1;
+    }
+
+    // Step 6: Read the Directory Cluster
+    size_t bytes_read = fread(cluster_buffer, 1, cluster_size, fs_image);
+    if (bytes_read != cluster_size)
+    {
+        perror("Error reading root directory cluster");
+        free(cluster_buffer);
+        return -1;
+    }
+
+    // Step 7: Scan Directory Entries for the File
+    directory_entry *entry = (directory_entry *)cluster_buffer;
+    stream_extension *stream_ext = NULL;
+
+    for (size_t i = 0; i < cluster_size / sizeof(directory_entry); i++)
+    {
+        if (entry[i].entry_type == DENTRY_TYPE_FILE) // Found a file entry
+        {
+            // The Stream Extension entry follows immediately
+            stream_ext = (stream_extension *)&entry[i + 1];
+
+            // Check if this file's first cluster matches `fd`
+            if (stream_ext->first_cluster == (uint32_t)fd)
+            {
+                // Found the correct file
+                uint64_t file_size = stream_ext->data_length;
+
+                free(cluster_buffer);
+                return (int)file_size; // Return file size as an int
+            }
+        }
+    }
+
+    // If no matching file was found
+    fprintf(stderr, "Error: File with cluster %d not found\n", fd);
+    free(cluster_buffer);
+    return -1;
+}
