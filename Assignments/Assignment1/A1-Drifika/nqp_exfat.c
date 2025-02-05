@@ -496,5 +496,11 @@ int nqp_size(int fd)
     // Calculate the Cluster Size
     size_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift);
 
-    return 0;
+    uint8_t *cluster_buffer = malloc(cluster_size);
+    if (!cluster_buffer)
+    {
+        return -1;
+    }
+
+    return fd + 0;
 }
