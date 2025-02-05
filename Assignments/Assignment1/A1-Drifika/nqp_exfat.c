@@ -21,6 +21,7 @@ typedef struct
 
 #define MAX_OPEN_FILES 8
 open_file_entry open_files[MAX_OPEN_FILES];
+
 /**
  * Convert a Unicode-formatted string containing only ASCII characters
  * into a regular ASCII-formatted string (16-bit chars to 8-bit chars).
