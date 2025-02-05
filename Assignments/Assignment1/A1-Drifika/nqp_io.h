@@ -125,6 +125,9 @@ ssize_t nqp_read(int fd, void *buffer, size_t count);
  */
 ssize_t nqp_getdents(int fd, void *dirp, size_t count);
 
+// Ali's own Helper Functions :::
+int nqp_size(int fd);
+
 #ifdef USE_LIBC_INSTEAD
 
 #include <fcntl.h>

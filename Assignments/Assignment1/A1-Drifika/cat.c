@@ -25,12 +25,13 @@ int main(int argc, char **argv)
             {
                 // Fix this a bit -- Need to input the Exact Size
                 // Need to get the File size using the stream extension first.
-                while ((bytes_read = nqp_read(fd, buffer, 256)) > 0)
+
+                int FileeeeSizeeee = nqp_size(fd);
+                bytes_read = nqp_read(fd, buffer, FileeeeSizeeee);
+
+                for (ssize_t i = 0; i < bytes_read; i++)
                 {
-                    for (ssize_t i = 0; i < bytes_read; i++)
-                    {
-                        putchar(buffer[i]);
-                    }
+                    putchar(buffer[i]);
                 }
 
                 nqp_close(fd);
