@@ -490,22 +490,22 @@ ssize_t nqp_getdents(int fd, void *dirp, size_t count)
 // 1. Problems while accessing/ opening/ reading Nested Files -- Fix it -- Problem Fixed
 // Above Problem is with not having the appropriate file extensions -- properly name ur files like .md or .txt extensions
 
-int nqp_size(void)
+int nqp_size(int fd)
 {
-
-    // Calculate the Cluster Size
+    // Step 1: Calculate Cluster Size
     size_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift);
 
+    // Step 2: Allocate Buffer for Reading the Cluster
     uint8_t *cluster_buffer = malloc(cluster_size);
     if (!cluster_buffer)
     {
         return -1;
     }
 
-    // uint64_t cluster_address = cluster_offset + (fd - 2) * cluster_size;
-    // directory_entry *entry = (directory_entry *)cluster_buffer;
-
+    // Step 3: Locate Root Directory Cluster
     uint32_t root_cluster = mbr.first_cluster_of_root_directory;
+
+    // Step 4: Compute Cluster Address for Directory Entries
     uint32_t cluster_offset = mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift);
     uint64_t cluster_address = cluster_offset + (root_cluster - 2) * cluster_size;
 
@@ -532,26 +532,25 @@ int nqp_size(void)
 
     for (size_t i = 0; i < cluster_size / sizeof(directory_entry); i++)
     {
-        if (entry[i].entry_type == DENTRY_TYPE_FILE) // Found file entry
+        if (entry[i].entry_type == DENTRY_TYPE_FILE) // Found a file entry
         {
             // The Stream Extension entry follows immediately
             stream_ext = (stream_extension *)&entry[i + 1];
-            break;
+
+            // Check if this file's first cluster matches `fd`
+            if (stream_ext->first_cluster == (uint32_t)fd)
+            {
+                // Found the correct file
+                uint64_t file_size = stream_ext->data_length;
+
+                free(cluster_buffer);
+                return (int)file_size; // Return file size as an int
+            }
         }
     }
 
-    if (!stream_ext)
-    {
-        fprintf(stderr, "Error: Stream Extension not found\n");
-        free(cluster_buffer);
-        return -1;
-    }
-
-    // Step 8: Extract File Size
-    uint64_t file_size = stream_ext->data_length;
-
-    // Cleanup
+    // If no matching file was found
+    fprintf(stderr, "Error: File with cluster %d not found\n", fd);
     free(cluster_buffer);
-
-    return (int)file_size;
+    return -1;
 }
