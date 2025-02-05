@@ -24,12 +24,11 @@ int main(int argc, char **argv)
             else
             {
                 // Fix this a bit -- Need to input the Exact Size of the file instead of just 256 bytes
-                while ((bytes_read = nqp_read(fd, buffer, 256)) > 0)
+                bytes_read = nqp_read(fd, buffer, 256) > 0
+
+                             for (ssize_t i = 0; i < bytes_read; i++);
                 {
-                    for (ssize_t i = 0; i < bytes_read; i++)
-                    {
-                        putchar(buffer[i]);
-                    }
+                    putchar(buffer[i]);
                 }
 
                 nqp_close(fd);
