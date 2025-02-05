@@ -502,5 +502,11 @@ int nqp_size(int fd)
         return -1;
     }
 
+    // uint32_t cluster_offset = mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift);
+    // uint64_t cluster_address = cluster_offset + (fd - 2) * cluster_size;
+    // directory_entry *entry = (directory_entry *)cluster_buffer;
+
+    uint32_t root_cluster = mbr.first_cluster_of_root_directory;
+
     return fd + 0;
 }
