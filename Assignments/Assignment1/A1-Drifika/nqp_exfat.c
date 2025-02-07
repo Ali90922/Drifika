@@ -234,7 +234,11 @@ int nqp_open(const char *pathname)
 
                         free(ascii_filename);
                         found = 1;
-                        break;
+
+                        int fd = -1;
+
+                        for (int slot = 0; slot < MAX_OPEN_FILES; slot++)
+                            break;
                     }
                     free(ascii_filename);
                 }
