@@ -186,6 +186,8 @@ int nqp_open(const char *pathname)
 
     size_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift);
     uint8_t *cluster_buffer = malloc(cluster_size);
+
+    // Post the open File to the OFT
     if (!cluster_buffer)
         return -1;
 
@@ -492,6 +494,7 @@ ssize_t nqp_getdents(int fd, void *dirp, size_t count)
 // Above Problem is with not having the appropriate file extensions -- properly name ur files like .md or .txt extensions
 
 // Problems wiht this function -- Better idea to implement an OFT
+// This function is trash -- come back to this
 int nqp_size(int fd)
 {
     if (fd < 2) // Invalid file descriptor (should be a valid cluster number)
