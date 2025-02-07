@@ -26,8 +26,8 @@ int main(int argc, char **argv)
                 // Fix this a bit -- Need to input the Exact Size
                 // Need to get the File size using the stream extension first.
 
-                // int FileeeeSizeeee = nqp_size(fd);
-                // printf("File size: %d bytes\n", FileeeeSizeeee);
+                int FileeeeSizeeee = nqp_size(fd);
+                printf("Fileeeee size: %d bytes\n", FileeeeSizeeee);
 
                 bytes_read = nqp_read(fd, buffer, 2157);
 

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 
 #include "nqp_io.h"
 #include "nqp_exfat_types.h"
@@ -490,59 +491,79 @@ ssize_t nqp_getdents(int fd, void *dirp, size_t count)
 // 1. Problems while accessing/ opening/ reading Nested Files -- Fix it -- Problem Fixed
 // Above Problem is with not having the appropriate file extensions -- properly name ur files like .md or .txt extensions
 
+// Problems wiht this function -- Better idea to implement an OFT
 int nqp_size(int fd)
 {
-
-    if (!is_mounted || fd < 2 || !buffer || count == 0)
-    {
-        return -1; // Invalid parameters
-    }
-
     if (fd < 2) // Invalid file descriptor (should be a valid cluster number)
     {
         return -1;
     }
 
-    uint32_t current_cluster = fd; // fd is the first cluster number
+    // Compute cluster size in bytes
+    uint32_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift);
 
-    // The left shift in the single bit is to raise the value to the power of 2 :
-    uint32_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift); // Total bytes per cluster
-
-    size_t bytes_read = 0;
+    // Allocate buffer for directory reading
     uint8_t *cluster_buffer = malloc(cluster_size);
-
     if (!cluster_buffer)
     {
-        return -1; // Memory allocation failure
+        return -1;
     }
 
-    while (current_cluster != 0xFFFFFFFF) // 0xFFFFFFFF = End of file
+    // Locate Root Directory Cluster
+    uint32_t root_cluster = mbr.first_cluster_of_root_directory;
+    uint32_t cluster_offset = mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift);
+    uint64_t cluster_address = cluster_offset + (root_cluster - 2) * cluster_size;
+
+    // Seek to the Root Directory
+    if (fseek(fs_image, cluster_address, SEEK_SET) != 0)
     {
-        // Compute the offset in the exFAT image
-        uint64_t cluster_offset = (mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift)) + (current_cluster - 2) * cluster_size;
-
-        // cluster_heap_offset is the start location of the file data in the exFAT
-        // current_cluster - 2 is there to convert the cluster number to index - since cluster numbers start from 2.
-        // So the final offset being calculated is : (Start of Cluster Heap) + (Offset of current cluster)
-
-        fseek(fs_image, cluster_offset, SEEK_SET);
-        if (fread(cluster_buffer, cluster_size, 1, fs_image) != 1)
-        {
-            free(cluster_buffer);
-            return -1; // Error reading from file system
-        }
-
-        // Read the requested bytes
-        size_t bytes_from_cluster = (bytes_to_read < cluster_size) ? bytes_to_read : cluster_size;
-        memcpy((char *)buffer + bytes_read, cluster_buffer, bytes_from_cluster);
-
-        bytes_read += bytes_from_cluster;
-        bytes_to_read -= bytes_from_cluster;
-
-        // Move to the next cluster in the file
-        fseek(fs_image, (mbr.fat_offset * (1 << mbr.bytes_per_sector_shift)) + (current_cluster * sizeof(uint32_t)), SEEK_SET);
-        fread(&current_cluster, sizeof(uint32_t), 1, fs_image);
+        perror("Error seeking to root directory cluster");
+        free(cluster_buffer);
+        return -1;
     }
 
-    return 0;
+    // Read the Directory Cluster
+    size_t bytes_read = fread(cluster_buffer, 1, cluster_size, fs_image);
+    if (bytes_read != cluster_size)
+    {
+        perror("Error reading root directory cluster");
+        free(cluster_buffer);
+        return -1;
+    }
+
+    // Scan Directory Entries for the File
+    directory_entry *entry = (directory_entry *)cluster_buffer;
+    stream_extension *stream_ext = NULL;
+
+    for (size_t i = 0; i < cluster_size / sizeof(directory_entry); i++)
+    {
+        if (entry[i].entry_type == DENTRY_TYPE_FILE) // Found a file entry
+        {
+            // The Stream Extension entry follows immediately
+            stream_ext = (stream_extension *)&entry[i + 1];
+
+            // Check if this file's first cluster matches `fd`
+            if (stream_ext->first_cluster == (uint32_t)fd)
+            {
+                // Found the correct file, extract file size
+                uint64_t file_size = stream_ext->data_length;
+
+                // Check for integer overflow
+                if (file_size > INT_MAX)
+                {
+                    fprintf(stderr, "Error: File size exceeds integer limit\n");
+                    free(cluster_buffer);
+                    return -1;
+                }
+
+                free(cluster_buffer);
+                return (int)file_size; // Return file size as an int
+            }
+        }
+    }
+
+    // If no matching file was found
+    fprintf(stderr, "Error: File with cluster %d not found\n", fd);
+    free(cluster_buffer);
+    return -1;
 }
