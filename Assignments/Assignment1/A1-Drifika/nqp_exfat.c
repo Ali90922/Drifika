@@ -582,3 +582,23 @@ int nqp_size(int fd)
     free(cluster_buffer);
     return -1;
 }
+
+// Function that Prints the Open File Table :
+void print_open_file_table(void)
+{
+    printf("Open File Table:\n");
+    for (int i = 0; i < MAX_OPEN_FILES; i++)
+    {
+        if (open_files[i].in_use)
+        {
+            printf("Slot %d: IN USE\n", i);
+            printf("   Start Cluster: %u\n", open_files[i].start_cluster);
+            printf("   File Size: %llu bytes\n", (unsigned long long)open_files[i].file_size);
+            printf("   Current Offset: %llu bytes\n", (unsigned long long)open_files[i].offset);
+        }
+        else
+        {
+            printf("Slot %d: FREE\n", i);
+        }
+    }
+}

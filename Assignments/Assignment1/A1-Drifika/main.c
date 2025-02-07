@@ -1,25 +1,30 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "nqp_io.h"
 #include <inttypes.h>
+#include "nqp_io.h" // This header should declare print_open_file_table() among other functions
 
+// Function prototypes for functions defined only in this file:
 void print_menu(void);
 void list_img_files(void);
+
+// Add the prototype for print_open_file_table if not declared in nqp_io.h
+void print_open_file_table(void);
 
 void print_menu(void)
 {
     printf("\nCommands:\n");
-    printf("  mount <fs_image>  - Mount an exFAT file system\n");
-    printf("  open <filename>   - Open a file\n");
-    printf("  read <fd> <size>  - Read bytes from an open file\n");
-    printf("  getdents <fd> <size> - List directory entries\n");
-    printf("  close <fd>        - Close an open file\n");
-    printf("  unmount           - Unmount the file system\n");
-    printf("  exit              - Exit the program\n");
+    printf("  mount <fs_image>        - Mount an exFAT file system\n");
+    printf("  open <filename>         - Open a file\n");
+    printf("  read <fd> <size>        - Read bytes from an open file\n");
+    printf("  getdents <fd> <size>    - List directory entries\n");
+    printf("  close <fd>              - Close an open file\n");
+    printf("  oft                     - Print the Open File Table (OFT)\n");
+    printf("  unmount                 - Unmount the file system\n");
+    printf("  exit                    - Exit the program\n");
 }
 
-// Function to list .img files without including dirent.h
+// Function to list .img files without using dirent.h
 void list_img_files(void)
 {
     printf("\nAvailable .img files:\n");
@@ -42,8 +47,9 @@ int main(void)
     while (1)
     {
         printf("\n> ");
-        fgets(command, sizeof(command), stdin);
-        command[strcspn(command, "\n")] = 0;
+        if (fgets(command, sizeof(command), stdin) == NULL)
+            break;
+        command[strcspn(command, "\n")] = '\0'; // Remove newline
 
         if (strncmp(command, "mount", 5) == 0)
         {
@@ -162,6 +168,11 @@ int main(void)
             {
                 printf("Unmount failed!\n");
             }
+        }
+        else if (strncmp(command, "oft", 3) == 0)
+        {
+            // Call the function to print the Open File Table
+            print_open_file_table();
         }
         else if (strncmp(command, "exit", 4) == 0)
         {
