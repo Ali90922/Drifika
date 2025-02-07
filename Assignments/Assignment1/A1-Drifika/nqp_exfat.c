@@ -235,8 +235,6 @@ int nqp_open(const char *pathname)
                         free(ascii_filename);
                         found = 1;
 
-                        int fd = -1;
-
                         for (int slot = 0; slot < MAX_OPEN_FILES; slot++)
                         {
                             if (!open_files[slot].in_use)
@@ -245,7 +243,6 @@ int nqp_open(const char *pathname)
                                 open_files[slot].start_cluster = file_cluster;
                                 open_files[slot].file_size = file_size; // Consider using valid_data_length here if preferred
                                 open_files[slot].offset = 0;            // Initial read offset is 0
-                                fd = slot;                              // Use the slot index as the file descriptor
                                 break;
                             }
                         }
