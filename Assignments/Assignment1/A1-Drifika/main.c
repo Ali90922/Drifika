@@ -11,6 +11,9 @@ void list_img_files(void);
 // Add the prototype for print_open_file_table if not declared in nqp_io.h
 void print_open_file_table(void);
 
+// ProtoType Function Added
+int FileSize(int FD);
+
 void print_menu(void)
 {
     printf("\nCommands:\n");

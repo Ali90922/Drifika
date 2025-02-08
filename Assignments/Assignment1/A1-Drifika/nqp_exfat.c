@@ -602,3 +602,17 @@ void print_open_file_table(void)
         }
     }
 }
+
+// Function that returns File using using FD
+int FileSize(int FD)
+{
+    for (int i = 0; i < MAX_OPEN_FILES; i++)
+    {
+        if (open_files[i].start_cluster == (uint32_t)FD)
+        {
+            return open_files[i].file_size;
+            break;
+        }
+    }
+    return -1;
+}
