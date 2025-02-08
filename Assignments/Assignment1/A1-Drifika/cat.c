@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// ProtoType Function Added
+int FileSize(int FD);
+
 int main(int argc, char **argv)
 {
     int fd = 0;
