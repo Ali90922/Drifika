@@ -309,56 +309,122 @@ int nqp_close(int fd)
  */
 ssize_t nqp_read(int fd, void *buffer, size_t count)
 {
+    // Check basic preconditions.
     if (!is_mounted || fd < 2 || !buffer || count == 0)
     {
         return -1; // Invalid parameters
     }
 
-    uint32_t current_cluster = fd; // fd is the first cluster number
-
-    // The left shift in the single bit is to raise the value to the power of 2 :
-    uint32_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift); // Total bytes per cluster
-
-    size_t bytes_read = 0;
-
-    size_t bytes_to_read = count;
-    uint8_t *cluster_buffer = malloc(cluster_size);
-
-    if (!cluster_buffer)
+    // Look up the open file entry corresponding to the file descriptor.
+    // (We assume that fd is the file’s starting cluster number.)
+    open_file_entry *file = NULL;
+    for (int i = 0; i < MAX_OPEN_FILES; i++)
     {
-        return -1; // Memory allocation failure
+        if (open_files[i].in_use && open_files[i].start_cluster == (uint32_t)fd)
+        {
+            file = &open_files[i];
+            break;
+        }
+    }
+    if (file == NULL)
+    {
+        return -1; // The file is not open.
     }
 
-    while (bytes_to_read > 0 && current_cluster != 0xFFFFFFFF) // 0xFFFFFFFF = End of file
+    // If we have reached or passed the end of the file, return 0 (EOF).
+    if (file->offset >= file->file_size)
     {
-        // Compute the offset in the exFAT image
-        uint64_t cluster_offset = (mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift)) + (current_cluster - 2) * cluster_size;
+        return 0;
+    }
 
-        // cluster_heap_offset is the start location of the file data in the exFAT
-        // current_cluster - 2 is there to convert the cluster number to index - since cluster numbers start from 2.
-        // So the final offset being calculated is : (Start of Cluster Heap) + (Offset of current cluster)
+    // Do not try to read beyond the file's end.
+    if (count > file->file_size - file->offset)
+    {
+        count = file->file_size - file->offset;
+    }
 
-        fseek(fs_image, cluster_offset, SEEK_SET);
+    // Calculate the size of a cluster.
+    uint32_t cluster_size = (1 << mbr.bytes_per_sector_shift) *
+                            (1 << mbr.sectors_per_cluster_shift);
+
+    // Allocate a temporary buffer for one cluster.
+    uint8_t *cluster_buffer = malloc(cluster_size);
+    if (!cluster_buffer)
+    {
+        return -1; // Memory allocation failure.
+    }
+
+    size_t total_bytes_read = 0;  // Total bytes read so far.
+    size_t bytes_to_read = count; // Bytes still needed to read.
+
+    // Determine the starting point: which cluster and what offset in that cluster.
+    size_t starting_offset = file->offset;
+    uint32_t current_cluster = file->start_cluster;
+    uint32_t clusters_to_skip = starting_offset / cluster_size;
+    size_t offset_in_cluster = starting_offset % cluster_size;
+
+    // Skip clusters that come entirely before the current offset.
+    for (uint32_t i = 0; i < clusters_to_skip; i++)
+    {
+        uint64_t fat_entry_offset = (mbr.fat_offset * (1 << mbr.bytes_per_sector_shift)) +
+                                    (current_cluster * sizeof(uint32_t));
+        fseek(fs_image, fat_entry_offset, SEEK_SET);
+        if (fread(&current_cluster, sizeof(uint32_t), 1, fs_image) != 1)
+        {
+            free(cluster_buffer);
+            return -1;
+        }
+        if (current_cluster == 0xFFFFFFFF)
+        { // Reached end-of-file chain prematurely.
+            free(cluster_buffer);
+            return total_bytes_read;
+        }
+    }
+
+    // Now, read cluster-by-cluster.
+    while (bytes_to_read > 0 && current_cluster != 0xFFFFFFFF)
+    {
+        // Calculate the absolute offset of the current cluster in the file system image.
+        uint64_t cluster_addr = (mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift)) +
+                                ((current_cluster - 2) * cluster_size);
+        fseek(fs_image, cluster_addr, SEEK_SET);
         if (fread(cluster_buffer, cluster_size, 1, fs_image) != 1)
         {
             free(cluster_buffer);
-            return -1; // Error reading from file system
+            return -1;
         }
 
-        // Read the requested bytes
-        size_t bytes_from_cluster = (bytes_to_read < cluster_size) ? bytes_to_read : cluster_size;
-        memcpy((char *)buffer + bytes_read, cluster_buffer, bytes_from_cluster);
+        // Determine how many bytes are available in the current cluster.
+        size_t available_in_cluster = cluster_size - offset_in_cluster;
+        size_t bytes_from_cluster = (bytes_to_read < available_in_cluster) ? bytes_to_read : available_in_cluster;
 
-        bytes_read += bytes_from_cluster;
+        // Copy the bytes from the cluster into the caller's buffer.
+        memcpy((char *)buffer + total_bytes_read, cluster_buffer + offset_in_cluster, bytes_from_cluster);
+
+        total_bytes_read += bytes_from_cluster;
         bytes_to_read -= bytes_from_cluster;
+        // Update the file's offset.
+        file->offset += bytes_from_cluster;
 
-        // Move to the next cluster in the file
-        fseek(fs_image, (mbr.fat_offset * (1 << mbr.bytes_per_sector_shift)) + (current_cluster * sizeof(uint32_t)), SEEK_SET);
-        fread(&current_cluster, sizeof(uint32_t), 1, fs_image);
+        // After the first cluster, subsequent clusters start reading at offset 0.
+        offset_in_cluster = 0;
+
+        if (bytes_to_read > 0)
+        {
+            // Follow the FAT chain to the next cluster.
+            uint64_t fat_entry_offset = (mbr.fat_offset * (1 << mbr.bytes_per_sector_shift)) +
+                                        (current_cluster * sizeof(uint32_t));
+            fseek(fs_image, fat_entry_offset, SEEK_SET);
+            if (fread(&current_cluster, sizeof(uint32_t), 1, fs_image) != 1)
+            {
+                free(cluster_buffer);
+                return -1;
+            }
+        }
     }
 
     free(cluster_buffer);
-    return bytes_read; // Return number of bytes read
+    return total_bytes_read; // Return the number of bytes read.
 }
 
 /**
