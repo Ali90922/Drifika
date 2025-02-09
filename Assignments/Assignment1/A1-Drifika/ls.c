@@ -3,6 +3,11 @@
 #include <stdlib.h>
 #include <inttypes.h> // Include this for PRIu64
 
+// Add the prototype for print_open_file_table if not declared in nqp_io.h
+void print_open_file_table(void);
+
+int FileSize(int FD);
+
 int main(int argc, char **argv)
 {
     nqp_dirent entry = {0};
