@@ -27,6 +27,10 @@ int main(int argc, char **argv)
             {
                 // Problem is most likely with the 3'rd Parameter which the Prof's code is passing in
                 // Prof's Stock Code : while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
+
+                // My Working Code -- Which I am working on !
+
+                // Not Working Code -- Does nothing
                 while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
                 {
                     printf("%" PRIu64 " %s", entry.inode_number, entry.name); // Fixed
