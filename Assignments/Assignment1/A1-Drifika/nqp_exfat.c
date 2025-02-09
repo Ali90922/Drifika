@@ -429,6 +429,65 @@ ssize_t nqp_read(int fd, void *buffer, size_t count)
     return total_bytes_read; // Return the number of bytes read.
 }
 
+/*
+
+
+Have to fix the Get Directories Program according to this ls program - which the prof has provided !
+int main(int argc, char **argv)
+{
+    nqp_dirent entry = {0};
+    nqp_error err;
+    int fd;
+    ssize_t dirents_read;
+
+    // This ls takes two arguments: The file system image and the directory to
+    // list the contents of.
+    if (argc == 3)
+    {
+        err = nqp_mount(argv[1], NQP_FS_EXFAT);
+        if (err == NQP_OK)
+        {
+            fd = nqp_open(argv[2]);
+
+            if (fd == NQP_FILE_NOT_FOUND)
+            {
+                fprintf(stderr, "%s not found\n", argv[2]);
+            }
+            else
+            {
+                while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
+                {
+                    printf("%llu %s", entry.inode_number, entry.name);
+
+                    if (entry.type == DT_DIR)
+                    {
+                        putchar('/');
+                    }
+
+                    putchar('\n');
+
+                    free(entry.name);
+                }
+
+                if (dirents_read == -1)
+                {
+                    fprintf(stderr, "%s is not a directory\n", argv[2]);
+                }
+
+                nqp_close(fd);
+            }
+        }
+
+        nqp_unmount();
+    }
+
+    return EXIT_SUCCESS;
+}
+
+
+
+*/
+
 /**
  * Get directory entries for a directory.
  */
