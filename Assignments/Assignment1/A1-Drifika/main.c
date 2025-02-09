@@ -2,32 +2,24 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
-#include "nqp_io.h" // This header should declare print_open_file_table() among other functions
+#include "nqp_io.h" // This header should declare all the exFAT API functions and types
 
 // Function prototypes for functions defined only in this file:
 void print_menu(void);
 void list_img_files(void);
 
-// Add the prototype for print_open_file_table if not declared in nqp_io.h
-void print_open_file_table(void);
-
-// ProtoType Function Added
-int FileSize(int FD);
-
 void print_menu(void)
 {
     printf("\nCommands:\n");
     printf("  mount <fs_image>        - Mount an exFAT file system\n");
-    printf("  open <filename>         - Open a file\n");
+    printf("  open <filename>         - Open a file or directory\n");
     printf("  read <fd> <size>        - Read bytes from an open file\n");
-    printf("  getdents <fd> <size>    - List directory entries\n");
+    printf("  getdents <fd> <dummy>   - List directory entries (reads one entry at a time)\n");
     printf("  close <fd>              - Close an open file\n");
-    printf("  oft                     - Print the Open File Table (OFT)\n");
     printf("  unmount                 - Unmount the file system\n");
     printf("  exit                    - Exit the program\n");
 }
 
-// Function to list .img files without using dirent.h
 void list_img_files(void)
 {
     printf("\nAvailable .img files:\n");
@@ -39,7 +31,7 @@ int main(void)
     char command[256];
     char arg1[128];
     int fd;
-    size_t count;
+    size_t dummy; // Dummy variable; the professor's ls ignores the count value.
     char buffer[1024];
     nqp_error status;
 
@@ -80,11 +72,11 @@ int main(void)
                 fd = nqp_open(arg1);
                 if (fd >= 0)
                 {
-                    printf("Opened file '%s', fd=%d\n", arg1, fd);
+                    printf("Opened '%s' with fd=%d\n", arg1, fd);
                 }
                 else
                 {
-                    printf("Failed to open file '%s'\n", arg1);
+                    printf("Failed to open '%s'\n", arg1);
                 }
             }
             else
@@ -94,9 +86,9 @@ int main(void)
         }
         else if (strncmp(command, "read", 4) == 0)
         {
-            if (sscanf(command, "read %d %zu", &fd, &count) == 2)
+            if (sscanf(command, "read %d %zu", &fd, &dummy) == 2)
             {
-                ssize_t bytes = nqp_read(fd, buffer, count);
+                ssize_t bytes = nqp_read(fd, buffer, dummy);
                 if (bytes > 0)
                 {
                     buffer[bytes] = '\0';
@@ -114,32 +106,33 @@ int main(void)
         }
         else if (strncmp(command, "getdents", 8) == 0)
         {
-            if (sscanf(command, "getdents %d %zu", &fd, &count) == 2)
+            // For the professor's ls, we ignore the dummy count and read one entry at a time.
+            if (sscanf(command, "getdents %d %zu", &fd, &dummy) == 2)
             {
-                ssize_t bytes = nqp_getdents(fd, buffer, count);
-                if (bytes > 0)
+                ssize_t dirents_read;
+                nqp_dirent entry = {0};
+
+                // Loop until no more entries are returned.
+                while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
                 {
-                    printf("Read %zd bytes from directory fd=%d\n", bytes, fd);
-
-                    // Cast the buffer to an array of nqp_dirent entries.
-                    nqp_dirent *entries = (nqp_dirent *)buffer;
-                    size_t num_entries = bytes / sizeof(nqp_dirent);
-
-                    // Print each directory entry.
-                    for (size_t i = 0; i < num_entries; i++)
+                    printf("%" PRIu64 " %s", entry.inode_number, entry.name);
+                    if (entry.type == DT_DIR)
                     {
-                        printf("Entry %zu:\n", i);
-                        printf("  Inode: %" PRIu64 "\n", entries[i].inode_number);
-                        printf("  Name: %s\n", entries[i].name);
-                        printf("  Type: %s\n", (entries[i].type == DT_DIR) ? "Directory" : "Regular File");
-                        printf("  Name Length: %zu\n", entries[i].name_len);
+                        putchar('/');
                     }
+                    putchar('\n');
+
+                    free(entry.name);
+                    memset(&entry, 0, sizeof(nqp_dirent));
                 }
-                else
+                if (dirents_read == -1)
                 {
-                    printf("Failed to list directory entries\n");
-                    printf("Value: %zd\n", bytes);
+                    fprintf(stderr, "Error: fd %d is not a directory\n", fd);
                 }
+            }
+            else
+            {
+                printf("Invalid command format. Usage: getdents <fd> <dummy>\n");
             }
         }
         else if (strncmp(command, "close", 5) == 0)
@@ -172,11 +165,6 @@ int main(void)
                 printf("Unmount failed!\n");
             }
         }
-        else if (strncmp(command, "oft", 3) == 0)
-        {
-            // Call the function to print the Open File Table
-            print_open_file_table();
-        }
         else if (strncmp(command, "exit", 4) == 0)
         {
             printf("Exiting...\n");
@@ -186,7 +174,7 @@ int main(void)
         {
             printf("Unknown command.\n");
             print_menu();
-            list_img_files(); // Re-list available .img files for user reference
+            list_img_files(); // Re-list available .img files for reference
         }
     }
     return 0;
