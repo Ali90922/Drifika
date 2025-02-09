@@ -55,8 +55,6 @@ int main(int argc, char **argv)
 
 Prof's Stock Code :
 
-
-
 #include "nqp_io.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,8 +85,6 @@ int main(int argc, char **argv)
             {
                 while ( ( bytes_read = nqp_read( fd, buffer, 256 ) ) > 0 )
                 {
-
-
                     for ( ssize_t i = 0 ; i < bytes_read; i++ )
                     {
                         putchar( buffer[i] );
