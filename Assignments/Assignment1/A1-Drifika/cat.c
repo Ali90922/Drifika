@@ -33,7 +33,7 @@ int main(int argc, char **argv)
 
                 printf("Fileeeee size: %d bytes\n", FileeeeSizeeee);
 
-                bytes_read = nqp_read(fd, buffer, 2157);
+                bytes_read = nqp_read(fd, buffer, FileeeeSizeeee);
 
                 for (ssize_t i = 0; i < bytes_read; i++)
                 {
@@ -69,6 +69,9 @@ int main(int argc, char **argv)
     int exit_code = EXIT_SUCCESS;
     nqp_error err = nqp_mount(argv[1], NQP_FS_EXFAT);
 
+
+
+
     if ( err == NQP_OK )
     {
         for (int i = 2; i < argc; i++)
@@ -84,6 +87,8 @@ int main(int argc, char **argv)
             {
                 while ( ( bytes_read = nqp_read( fd, buffer, 256 ) ) > 0 )
                 {
+
+
                     for ( ssize_t i = 0 ; i < bytes_read; i++ )
                     {
                         putchar( buffer[i] );
