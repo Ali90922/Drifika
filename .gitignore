@@ -1,1 +1,18 @@
 .DS_Store
+
+
+# Ignore all object files
+*.o
+
+# Ignore executables (if they are always built from source)
+ls
+cat.o
+ls.o
+main
+main.o
+nqp_exfat.o
+paste
+paste.o
+
+# Optionally, if your build system puts binaries in a specific folder, ignore that folder
+/build/
