@@ -429,202 +429,130 @@ ssize_t nqp_read(int fd, void *buffer, size_t count)
     return total_bytes_read; // Return the number of bytes read.
 }
 
-/*
-
-
-Have to fix the Get Directories Program according to this ls program - which the prof has provided !
-int main(int argc, char **argv)
-{
-    nqp_dirent entry = {0};
-    nqp_error err;
-    int fd;
-    ssize_t dirents_read;
-
-    // This ls takes two arguments: The file system image and the directory to
-    // list the contents of.
-    if (argc == 3)
-    {
-        err = nqp_mount(argv[1], NQP_FS_EXFAT);
-        if (err == NQP_OK)
-        {
-            fd = nqp_open(argv[2]);
-
-            if (fd == NQP_FILE_NOT_FOUND)
-            {
-                fprintf(stderr, "%s not found\n", argv[2]);
-            }
-            else
-            {
-                while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
-                {
-                    printf("%llu %s", entry.inode_number, entry.name);
-
-                    if (entry.type == DT_DIR)
-                    {
-                        putchar('/');
-                    }
-
-                    putchar('\n');
-
-                    free(entry.name);
-                }
-
-                if (dirents_read == -1)
-                {
-                    fprintf(stderr, "%s is not a directory\n", argv[2]);
-                }
-
-                nqp_close(fd);
-            }
-        }
-
-        nqp_unmount();
-    }
-
-    return EXIT_SUCCESS;
-}
-
-
-
-*/
-
-/**
- * Get directory entries for a directory.
- */
-
-/**
- * Get the directory entries for a directory. Similar to read()ing a file, you
- * may need to call this function repeatedly to get all directory entries.
- *
- * Parameters:
- *  * fd: The file descriptor to read from. Must be a nonnegative integer. The
- *        file descriptor should refer to a directory, not a file.
- *  * dirp: the buffer into which the directory entries will be written. The
- *          buffer must not be NULL.
- *  * count: the size of the buffer. Must be at least sizeof(nqp_dirent).
- * Return: The total number of bytes read into the buffer, 0 at the end of the
- * directory, or -1 on error.
- */
 ssize_t nqp_getdents(int fd, void *dirp, size_t count)
 {
-    // Validate input parameters
-    if (!is_mounted || fd < 2 || !dirp || count < sizeof(nqp_dirent))
+    // Here, 'count' is the number of nqp_dirent entries to read.
+    if (!is_mounted || fd < 2 || !dirp || count < 1)
     {
         return -69;
     }
 
-    // Calculate cluster size in bytes
+    // We'll only support count == 1 (i.e. one entry per call) for this simple ls.
+    // Use static variables to keep track of our directory reading state.
+    static uint32_t current_cluster = 0;
+    static size_t current_index = 0;
+    static int state_initialized = 0;
+
+    // If state is not yet initialized (or if this is the first call for this directory),
+    // initialize with the starting cluster (which is passed as fd) and reset index.
+    if (!state_initialized)
+    {
+        current_cluster = fd;
+        current_index = 0;
+        state_initialized = 1;
+    }
+
+    // Allocate a temporary buffer to read one cluster.
     uint32_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift);
     uint8_t *cluster_buffer = malloc(cluster_size);
     if (!cluster_buffer)
     {
-        return -1; // Memory allocation failure
+        return -1;
     }
 
-    // 'dentries' will point to successive nqp_dirent structures in the caller's buffer.
-    nqp_dirent *dentries = (nqp_dirent *)dirp;
-    size_t bytes_written = 0;
+    nqp_dirent *result_entry = (nqp_dirent *)dirp; // This is where we'll store the one entry to return.
+    int found = 0;
 
-    // Start reading from the directory cluster (fd is the starting cluster number)
-    uint32_t current_cluster = fd;
-    int done = 0;
-
-    while (!done && current_cluster != 0xFFFFFFFF)
+    // Loop until we find one valid directory entry or we reach the end.
+    while (!found && current_cluster != 0xFFFFFFFF)
     {
-        // Compute the absolute byte offset of the current cluster in the image
+        // Compute the byte offset for the current cluster.
         uint64_t cluster_offset = (mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift)) +
                                   (current_cluster - 2) * cluster_size;
         fseek(fs_image, cluster_offset, SEEK_SET);
         if (fread(cluster_buffer, cluster_size, 1, fs_image) != 1)
         {
             free(cluster_buffer);
-            return -1; // Error reading from the file system
+            return -1; // Error reading from the file system.
         }
 
-        // Interpret the cluster data as an array of directory_entry structures.
         size_t num_entries = cluster_size / sizeof(directory_entry);
-        directory_entry *entry = (directory_entry *)cluster_buffer;
+        directory_entry *entries = (directory_entry *)cluster_buffer;
 
-        // Iterate over each directory entry in the cluster
-        for (size_t i = 0; i < num_entries; i++)
+        // Iterate over the entries in this cluster, starting at current_index.
+        for (size_t i = current_index; i < num_entries; i++)
         {
-            // If we encounter an end-of-directory marker, stop processing.
-            if (entry[i].entry_type == DENTRY_TYPE_END)
+            // If we encounter an end-of-directory marker, we're done.
+            if (entries[i].entry_type == DENTRY_TYPE_END)
             {
-                done = 1;
-                break;
+                // Reset state for next directory read.
+                state_initialized = 0;
+                free(cluster_buffer);
+                return 0;
             }
 
-            // We assume that a valid file (or directory) entry set starts with a FILE entry,
-            // followed by a STREAM_EXTENSION entry and then one or more FILE_NAME entries.
-            if (entry[i].entry_type == DENTRY_TYPE_FILE)
+            // Look for a valid entry set starting with a FILE entry.
+            if (entries[i].entry_type == DENTRY_TYPE_FILE)
             {
-                // Basic sanity check: make sure the following two entries exist.
+                // Check that the next two entries exist.
                 if (i + 2 >= num_entries)
-                    continue; // Not enough entries left in this cluster; ideally, you would handle spanning clusters.
+                    break; // Not enough entries in this cluster; we'll fetch the next cluster.
 
-                // Check that the next entry is a STREAM_EXTENSION and the one after is a FILE_NAME.
-                if (entry[i + 1].entry_type != DENTRY_TYPE_STREAM_EXTENSION ||
-                    entry[i + 2].entry_type != DENTRY_TYPE_FILE_NAME)
+                // Verify that we have a STREAM_EXTENSION and a FILE_NAME following.
+                if (entries[i + 1].entry_type != DENTRY_TYPE_STREAM_EXTENSION ||
+                    entries[i + 2].entry_type != DENTRY_TYPE_FILE_NAME)
                 {
-                    continue; // Skip invalid or incomplete entry set
+                    continue; // Not a valid entry set; skip.
                 }
 
-                // Convert the Unicode file name from the FILE_NAME entry to an ASCII string.
-                // Note: The file_name entry has a field 'file_name' that is an array of 15 uint16_t values.
-                char *ascii_name = unicode2ascii(entry[i + 2].file_name.file_name, 15);
+                // Convert the Unicode file name (15 uint16_t characters) to ASCII.
+                char *ascii_name = unicode2ascii(entries[i + 2].file_name.file_name, 15);
                 if (!ascii_name)
                     continue;
 
                 // Populate the nqp_dirent structure.
-                // For inode_number, we use the first_cluster from the STREAM_EXTENSION.
-                dentries->inode_number = entry[i + 1].stream_extension.first_cluster;
-                // The name pointer is set to the allocated ASCII string.
-                dentries->name = ascii_name;
-                // Record the length of the name.
-                dentries->name_len = strlen(ascii_name);
-                // Determine the file type.
-                // For example, if a certain bit is set in file_attributes indicating a directory, mark it as DT_DIR.
-                // (Here, we simply use DT_REG for file entries and DT_DIR for directories, based on a hypothetical flag.)
-                if (entry[i].file.file_attributes & 0x10) // Replace 0x10 with the proper directory flag if needed.
+                result_entry->inode_number = entries[i + 1].stream_extension.first_cluster;
+                result_entry->name = ascii_name;
+                result_entry->name_len = strlen(ascii_name);
+                // Use a flag (here 0x10) to indicate a directory—adjust as needed.
+                if (entries[i].file.file_attributes & 0x10)
                 {
-                    dentries->type = DT_DIR;
+                    result_entry->type = DT_DIR;
                 }
                 else
                 {
-                    dentries->type = DT_REG;
+                    result_entry->type = DT_REG;
                 }
 
-                // Advance the output pointer and update the number of bytes written.
-                bytes_written += sizeof(nqp_dirent);
-                dentries++; // Move to the next slot in the caller's buffer.
-
-                // Skip the next two entries that we already processed.
-                i += 2;
-
-                // Check if the buffer is full.
-                if (bytes_written + sizeof(nqp_dirent) > count)
-                {
-                    free(cluster_buffer);
-                    return bytes_written;
-                }
+                // Update our state: advance the index beyond the processed entry set.
+                current_index = i + 3;
+                found = 1;
+                break;
             }
         }
 
-        // Move to the next cluster in the directory's FAT chain.
-        uint64_t fat_entry_offset = (mbr.fat_offset * (1 << mbr.bytes_per_sector_shift)) +
-                                    (current_cluster * sizeof(uint32_t));
-        fseek(fs_image, fat_entry_offset, SEEK_SET);
-        if (fread(&current_cluster, sizeof(uint32_t), 1, fs_image) != 1)
+        if (!found)
         {
-            free(cluster_buffer);
-            return -1;
+            // We did not find a valid entry in this cluster.
+            // Reset current_index for the next cluster.
+            current_index = 0;
+            // Read the FAT entry to get the next cluster in the directory chain.
+            uint64_t fat_entry_offset = (mbr.fat_offset * (1 << mbr.bytes_per_sector_shift)) +
+                                        (current_cluster * sizeof(uint32_t));
+            fseek(fs_image, fat_entry_offset, SEEK_SET);
+            if (fread(&current_cluster, sizeof(uint32_t), 1, fs_image) != 1)
+            {
+                free(cluster_buffer);
+                return -1;
+            }
         }
     }
 
     free(cluster_buffer);
-
-    return bytes_written; // Return the total number of bytes written to the buffer.
+    if (found)
+        return sizeof(nqp_dirent); // Return the number of bytes (one entry).
+    else
+        return 0;
 }
 
 // Problems :
