@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
-#include "nqp_io.h" // This header should declare all the exFAT API functions and types
+#include "nqp_io.h" // This header should declare all exFAT API functions and types
 
 // Function prototypes for functions defined only in this file:
 void print_menu(void);
@@ -13,7 +13,7 @@ void print_menu(void)
     printf("\nCommands:\n");
     printf("  mount <fs_image>        - Mount an exFAT file system\n");
     printf("  open <filename>         - Open a file or directory\n");
-    printf("  read <fd> <size>        - Read bytes from an open file\n");
+    printf("  read <fd>               - Read a file (cat-style, in 256-byte chunks)\n");
     printf("  getdents <fd> <dummy>   - List directory entries (reads one entry at a time)\n");
     printf("  close <fd>              - Close an open file\n");
     printf("  unmount                 - Unmount the file system\n");
@@ -31,7 +31,7 @@ int main(void)
     char command[256];
     char arg1[128];
     int fd;
-    size_t dummy; // Dummy variable; the professor's ls ignores the count value.
+    size_t dummy; // Dummy variable (used for getdents command)
     char buffer[1024];
     nqp_error status;
 
@@ -86,27 +86,27 @@ int main(void)
         }
         else if (strncmp(command, "read", 4) == 0)
         {
-            if (sscanf(command, "read %d %zu", &fd, &dummy) == 2)
+            // Cat-style reading: read in 256-byte chunks until EOF.
+            if (sscanf(command, "read %d", &fd) == 1)
             {
-                ssize_t bytes = nqp_read(fd, buffer, dummy);
-                if (bytes > 0)
+                ssize_t bytes_read;
+                while ((bytes_read = nqp_read(fd, buffer, 256)) > 0)
                 {
-                    buffer[bytes] = '\0';
-                    printf("Read %zd bytes: %s\n", bytes, buffer);
+                    for (ssize_t i = 0; i < bytes_read; i++)
+                    {
+                        putchar(buffer[i]);
+                    }
                 }
-                else
-                {
-                    printf("Failed to read from fd=%d\n", fd);
-                }
+                putchar('\n');
             }
             else
             {
-                printf("Invalid command format. Usage: read <fd> <size>\n");
+                printf("Invalid command format. Usage: read <fd>\n");
             }
         }
         else if (strncmp(command, "getdents", 8) == 0)
         {
-            // For the professor's ls, we ignore the dummy count and read one entry at a time.
+            // For the professor's ls: ignore the dummy count and read one entry at a time.
             if (sscanf(command, "getdents %d %zu", &fd, &dummy) == 2)
             {
                 ssize_t dirents_read;
