@@ -40,7 +40,7 @@ The project is designed to compile on the Aviary system. To compile the project,
 
 ```bash
 make
-
+``
 To clean previous builds, run:
-```bash
+``
 make clean
