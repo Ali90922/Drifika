@@ -40,7 +40,19 @@ The project is designed to compile on the Aviary system. To compile the project,
 
 ```bash
 make
-``
+```
 To clean previous builds, run:
-``
+
+```bash
 make clean
+```
+
+### Running the Program :
+After compiling, you can run the provided utility programs that use the implemented exFAT interface. For example
+
+cat: Display the contents of a file.
+```bash
+./cat Drifika.img README.md
+```
+
+
