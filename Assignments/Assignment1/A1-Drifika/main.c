@@ -7,6 +7,7 @@
 // Function prototypes for functions defined only in this file:
 void print_menu(void);
 void list_img_files(void);
+void cleanup(void);
 
 void print_menu(void)
 {
@@ -26,8 +27,26 @@ void list_img_files(void)
     system("ls *.img 2>/dev/null || echo '  No .img files found.'");
 }
 
+// A helper function to perform cleanup before exit.
+void cleanup(void)
+{
+    // Attempt to unmount the file system.
+    nqp_error status = nqp_unmount();
+    if (status == NQP_OK)
+    {
+        printf("Unmounted successfully during cleanup.\n");
+    }
+    else
+    {
+        printf("No file system to unmount or unmount failed during cleanup.\n");
+    }
+}
+
 int main(void)
 {
+    // Set stdout to unbuffered to help ensure prompt output on all systems.
+    setvbuf(stdout, NULL, _IONBF, 0);
+
     char command[256];
     char arg1[128];
     int fd;
@@ -46,9 +65,15 @@ int main(void)
             break;
         command[strcspn(command, "\n")] = '\0'; // Remove newline
 
-        if (strncmp(command, "mount", 5) == 0)
+        // Create a pointer to traverse the command string.
+        char *cmd_ptr = command;
+        // Trim leading whitespace.
+        while (*cmd_ptr == ' ' || *cmd_ptr == '\t')
+            cmd_ptr++;
+
+        if (strncmp(cmd_ptr, "mount", 5) == 0)
         {
-            if (sscanf(command, "mount %127s", arg1) == 1)
+            if (sscanf(cmd_ptr, "mount %127s", arg1) == 1)
             {
                 status = nqp_mount(arg1, NQP_FS_EXFAT);
                 if (status == NQP_OK)
@@ -65,9 +90,9 @@ int main(void)
                 printf("Invalid command format. Usage: mount <fs_image>\n");
             }
         }
-        else if (strncmp(command, "open", 4) == 0)
+        else if (strncmp(cmd_ptr, "open", 4) == 0)
         {
-            if (sscanf(command, "open %127s", arg1) == 1)
+            if (sscanf(cmd_ptr, "open %127s", arg1) == 1)
             {
                 fd = nqp_open(arg1);
                 if (fd >= 0)
@@ -84,10 +109,10 @@ int main(void)
                 printf("Invalid command format. Usage: open <filename>\n");
             }
         }
-        else if (strncmp(command, "read", 4) == 0)
+        else if (strncmp(cmd_ptr, "read", 4) == 0)
         {
             // Cat-style reading: read in 256-byte chunks until EOF.
-            if (sscanf(command, "read %d", &fd) == 1)
+            if (sscanf(cmd_ptr, "read %d", &fd) == 1)
             {
                 ssize_t bytes_read;
                 while ((bytes_read = nqp_read(fd, buffer, 256)) > 0)
@@ -104,10 +129,10 @@ int main(void)
                 printf("Invalid command format. Usage: read <fd>\n");
             }
         }
-        else if (strncmp(command, "getdents", 8) == 0)
+        else if (strncmp(cmd_ptr, "getdents", 8) == 0)
         {
             // For the professor's ls: ignore the dummy count and read one entry at a time.
-            if (sscanf(command, "getdents %d %zu", &fd, &dummy) == 2)
+            if (sscanf(cmd_ptr, "getdents %d %zu", &fd, &dummy) == 2)
             {
                 ssize_t dirents_read;
                 nqp_dirent entry = {0};
@@ -135,9 +160,9 @@ int main(void)
                 printf("Invalid command format. Usage: getdents <fd> <dummy>\n");
             }
         }
-        else if (strncmp(command, "close", 5) == 0)
+        else if (strncmp(cmd_ptr, "close", 5) == 0)
         {
-            if (sscanf(command, "close %d", &fd) == 1)
+            if (sscanf(cmd_ptr, "close %d", &fd) == 1)
             {
                 if (nqp_close(fd) == 0)
                 {
@@ -153,7 +178,7 @@ int main(void)
                 printf("Invalid command format. Usage: close <fd>\n");
             }
         }
-        else if (strncmp(command, "unmount", 7) == 0)
+        else if (strncmp(cmd_ptr, "unmount", 7) == 0)
         {
             status = nqp_unmount();
             if (status == NQP_OK)
@@ -165,10 +190,11 @@ int main(void)
                 printf("Unmount failed!\n");
             }
         }
-        else if (strncmp(command, "exit", 4) == 0)
+        else if (strncmp(cmd_ptr, "exit", 4) == 0)
         {
             printf("Exiting...\n");
-            break;
+            cleanup(); // Clean up any resources (e.g., unmount the file system)
+            exit(0);
         }
         else
         {
@@ -177,5 +203,7 @@ int main(void)
             list_img_files(); // Re-list available .img files for reference
         }
     }
+    // In case we exit the loop due to EOF, do final cleanup.
+    cleanup();
     return 0;
 }
