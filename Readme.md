@@ -19,3 +19,6 @@ Week 13: Swapping.
 
 
 ExFat OpenSource :  https://github.com/relan/exfat
+
+
+Ext2 File System Manual : https://docs.kernel.org/filesystems/ext2.html
