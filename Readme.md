@@ -21,4 +21,4 @@ Week 13: Swapping.
 ExFat OpenSource :  https://github.com/relan/exfat
 
 
-Ext2 File System Manual : https://docs.kernel.org/filesystems/ext2.html
+Ext2 File System Manual : https://www.nongnu.org/ext2-doc/ext2.html
