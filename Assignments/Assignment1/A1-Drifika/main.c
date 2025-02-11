@@ -14,7 +14,7 @@ void print_menu(void)
     printf("\nCommands:\n");
     printf("  mount <fs_image>        - Mount an exFAT file system\n");
     printf("  open <filename>         - Open a file or directory\n");
-    printf("  read <fd>               - Read a file (cat-style, in 256-byte chunks)\n");
+    printf("  read <fd> <size>        - Read bytes from an open file\n");
     printf("  getdents <fd> <dummy>   - List directory entries (reads one entry at a time)\n");
     printf("  close <fd>              - Close an open file\n");
     printf("  unmount                 - Unmount the file system\n");
@@ -24,13 +24,14 @@ void print_menu(void)
 void list_img_files(void)
 {
     printf("\nAvailable .img files:\n");
+    // This will list any *.img files in the current directory;
+    // if there are none, it prints a default message.
     system("ls *.img 2>/dev/null || echo '  No .img files found.'");
 }
 
 // A helper function to perform cleanup before exit.
 void cleanup(void)
 {
-    // Attempt to unmount the file system.
     nqp_error status = nqp_unmount();
     if (status == NQP_OK)
     {
@@ -54,8 +55,9 @@ int main(void)
     char buffer[1024];
     nqp_error status;
 
+    // Print the welcome message and list available image files only once.
     printf("Welcome to exFAT CLI Tester\n");
-    list_img_files(); // Show available .img files
+    list_img_files();
     print_menu();
 
     while (1)
@@ -200,10 +202,10 @@ int main(void)
         {
             printf("Unknown command.\n");
             print_menu();
-            list_img_files(); // Re-list available .img files for reference
+            // Removed list_img_files() here to avoid repeated printing.
         }
     }
-    // In case we exit the loop due to EOF, do final cleanup.
+    // In case we exit the loop (e.g., EOF), perform final cleanup.
     cleanup();
     return 0;
 }
