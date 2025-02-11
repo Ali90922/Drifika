@@ -6,7 +6,6 @@
 
 // Function prototypes for functions defined only in this file:
 void print_menu(void);
-void list_img_files(void);
 void cleanup(void);
 
 void print_menu(void)
@@ -19,14 +18,6 @@ void print_menu(void)
     printf("  close <fd>              - Close an open file\n");
     printf("  unmount                 - Unmount the file system\n");
     printf("  exit                    - Exit the program\n");
-}
-
-void list_img_files(void)
-{
-    printf("\nAvailable .img files:\n");
-    // This will list any *.img files in the current directory;
-    // if there are none, it prints a default message.
-    system("ls *.img 2>/dev/null || echo '  No .img files found.'");
 }
 
 // A helper function to perform cleanup before exit.
@@ -55,9 +46,8 @@ int main(void)
     char buffer[1024];
     nqp_error status;
 
-    // Print the welcome message and list available image files only once.
+    // Print the welcome message and menu only once.
     printf("Welcome to exFAT CLI Tester\n");
-    list_img_files();
     print_menu();
 
     while (1)
@@ -202,7 +192,6 @@ int main(void)
         {
             printf("Unknown command.\n");
             print_menu();
-            // Removed list_img_files() here to avoid repeated printing.
         }
     }
     // In case we exit the loop (e.g., EOF), perform final cleanup.
