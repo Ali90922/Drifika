@@ -434,7 +434,7 @@ ssize_t nqp_getdents(int fd, void *dirp, size_t count)
     // Here, 'count' is the number of nqp_dirent entries to read.
     if (!is_mounted || fd < 2 || !dirp || count < 1)
     {
-        return -69;
+        return -1;
     }
 
     // We'll only support count == 1 (i.e. one entry per call) for this simple ls.
