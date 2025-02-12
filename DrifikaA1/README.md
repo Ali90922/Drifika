@@ -1,6 +1,6 @@
 # COMP 3430 Assignment 1: exFAT File System Implementation
 
-**Author:** Your Name  
+**Author:** Ali Nawaz  
 **Course:** COMP 3430  
 **Term:** Winter 2025
 
@@ -54,5 +54,20 @@ cat: Display the contents of a file.
 ```bash
 ./cat Drifika.img README.md
 ```
+
+ls : List the contents of a directory.
+```bash
+./ls Drifika.img Juventus
+```
+
+paste : Merge or display contents from multiple files
+```bash
+./paste Drifika.img README.md Uefa.txt
+```
+
+Please Ensure the file sstem image(Drifika.img) and the target files or directories exist and are in the same directory as the program. 
+
+
+
 
 
