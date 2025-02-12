@@ -1,0 +1,200 @@
+/**
+ * Read data from a file.
+ */
+/**
+ * Read from a file desriptor.
+ *
+ * Parameters:
+ *  * fd: The file descriptor to read from. Must be a nonnegative integer. The
+ *        file descriptor should refer to a file, not a directory.
+ *  * buffer: The buffer to read data into. Must not be NULL.
+ *  * count: The number of bytes to read into the buffer.
+ * Return: The number of bytes read, 0 at the end of the file, or -1 on error.
+ */
+ssize_t nqp_read(int fd, void *buffer, size_t count)
+{
+    if (!is_mounted || fd < 2 || !buffer || count == 0)
+    {
+        return -1; // Invalid parameters
+    }
+
+    uint32_t current_cluster = fd; // fd is the first cluster number
+
+    // The left shift in the single bit is to raise the value to the power of 2 :
+    uint32_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift); // Total bytes per cluster
+
+    size_t bytes_read = 0;
+
+    size_t bytes_to_read = count;
+    uint8_t *cluster_buffer = malloc(cluster_size);
+
+    if (!cluster_buffer)
+    {
+        return -1; // Memory allocation failure
+    }
+
+    while (bytes_to_read > 0 && current_cluster != 0xFFFFFFFF) // 0xFFFFFFFF = End of file
+    {
+        // Compute the offset in the exFAT image
+        uint64_t cluster_offset = (mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift)) + (current_cluster - 2) * cluster_size;
+
+        // cluster_heap_offset is the start location of the file data in the exFAT
+        // current_cluster - 2 is there to convert the cluster number to index - since cluster numbers start from 2.
+        // So the final offset being calculated is : (Start of Cluster Heap) + (Offset of current cluster)
+
+        fseek(fs_image, cluster_offset, SEEK_SET);
+        if (fread(cluster_buffer, cluster_size, 1, fs_image) != 1)
+        {
+            free(cluster_buffer);
+            return -1; // Error reading from file system
+        }
+
+        // Read the requested bytes
+        size_t bytes_from_cluster = (bytes_to_read < cluster_size) ? bytes_to_read : cluster_size;
+        memcpy((char *)buffer + bytes_read, cluster_buffer, bytes_from_cluster);
+
+        bytes_read += bytes_from_cluster;
+        bytes_to_read -= bytes_from_cluster;
+
+        // Move to the next cluster in the file
+        fseek(fs_image, (mbr.fat_offset * (1 << mbr.bytes_per_sector_shift)) + (current_cluster * sizeof(uint32_t)), SEEK_SET);
+        fread(&current_cluster, sizeof(uint32_t), 1, fs_image);
+    }
+
+    free(cluster_buffer);
+    return bytes_read; // Return number of bytes read
+} /**
+   * Read data from a file.
+   */
+/**
+ * Read from a file desriptor.
+ *
+ * Parameters:
+ *  * fd: The file descriptor to read from. Must be a nonnegative integer. The
+ *        file descriptor should refer to a file, not a directory.
+ *  * buffer: The buffer to read data into. Must not be NULL.
+ *  * count: The number of bytes to read into the buffer.
+ * Return: The number of bytes read, 0 at the end of the file, or -1 on error.
+ */
+ssize_t nqp_read(int fd, void *buffer, size_t count)
+{
+    if (!is_mounted || fd < 2 || !buffer || count == 0)
+    {
+        return -1; // Invalid parameters
+    }
+
+    uint32_t current_cluster = fd; // fd is the first cluster number
+
+    // The left shift in the single bit is to raise the value to the power of 2 :
+    uint32_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift); // Total bytes per cluster
+
+    size_t bytes_read = 0;
+
+    size_t bytes_to_read = count;
+    uint8_t *cluster_buffer = malloc(cluster_size);
+
+    if (!cluster_buffer)
+    {
+        return -1; // Memory allocation failure
+    }
+
+    while (bytes_to_read > 0 && current_cluster != 0xFFFFFFFF) // 0xFFFFFFFF = End of file
+    {
+        // Compute the offset in the exFAT image
+        uint64_t cluster_offset = (mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift)) + (current_cluster - 2) * cluster_size;
+
+        // cluster_heap_offset is the start location of the file data in the exFAT
+        // current_cluster - 2 is there to convert the cluster number to index - since cluster numbers start from 2.
+        // So the final offset being calculated is : (Start of Cluster Heap) + (Offset of current cluster)
+
+        fseek(fs_image, cluster_offset, SEEK_SET);
+        if (fread(cluster_buffer, cluster_size, 1, fs_image) != 1)
+        {
+            free(cluster_buffer);
+            return -1; // Error reading from file system
+        }
+
+        // Read the requested bytes
+        size_t bytes_from_cluster = (bytes_to_read < cluster_size) ? bytes_to_read : cluster_size;
+        memcpy((char *)buffer + bytes_read, cluster_buffer, bytes_from_cluster);
+
+        bytes_read += bytes_from_cluster;
+        bytes_to_read -= bytes_from_cluster;
+
+        // Move to the next cluster in the file
+        fseek(fs_image, (mbr.fat_offset * (1 << mbr.bytes_per_sector_shift)) + (current_cluster * sizeof(uint32_t)), SEEK_SET);
+        fread(&current_cluster, sizeof(uint32_t), 1, fs_image);
+    }
+
+    free(cluster_buffer);
+    return bytes_read; // Return number of bytes read
+}
+
+// Incorrect Size Function :
+int nqp_size(int fd)
+{
+    // Step 1: Calculate Cluster Size
+    size_t cluster_size = (1 << mbr.bytes_per_sector_shift) * (1 << mbr.sectors_per_cluster_shift);
+
+    // Step 2: Allocate Buffer for Reading the Cluster
+    uint8_t *cluster_buffer = malloc(cluster_size);
+    if (!cluster_buffer)
+    {
+        return -1;
+    }
+
+    // Step 3: Locate Root Directory Cluster
+    uint32_t root_cluster = mbr.first_cluster_of_root_directory;
+
+    // Step 4: Compute Cluster Address for Directory Entries
+    uint32_t cluster_offset = mbr.cluster_heap_offset * (1 << mbr.bytes_per_sector_shift);
+    uint64_t cluster_address = cluster_offset + (root_cluster - 2) * cluster_size;
+
+    // Step 5: Seek to the Root Directory
+    if (fseek(fs_image, cluster_address, SEEK_SET) != 0)
+    {
+        perror("Error seeking to root directory cluster");
+        free(cluster_buffer);
+        return -1;
+    }
+
+    // Step 6: Read the Directory Cluster
+    size_t bytes_read = fread(cluster_buffer, 1, cluster_size, fs_image);
+    if (bytes_read != cluster_size)
+    {
+        perror("Error reading root directory cluster");
+        free(cluster_buffer);
+        return -1;
+    }
+
+    // Step 7: Scan Directory Entries for the File
+    directory_entry *entry = (directory_entry *)cluster_buffer;
+    stream_extension *stream_ext = NULL;
+
+    for (size_t i = 0; i < cluster_size / sizeof(directory_entry); i++)
+    {
+        if (entry[i].entry_type == DENTRY_TYPE_FILE) // Found a file entry
+        {
+            // The Stream Extension entry follows immediately
+            stream_ext = (stream_extension *)&entry[i + 1];
+
+            // Check if this file's first cluster matches `fd`
+            if (stream_ext->first_cluster == (uint32_t)fd)
+            {
+                // Found the correct file
+                uint64_t file_size = stream_ext->data_length;
+
+                free(cluster_buffer);
+                return (int)file_size; // Return file size as an int
+            }
+        }
+    }
+
+    // If no matching file was found
+    fprintf(stderr, "Error: File with cluster %d not found\n", fd);
+    free(cluster_buffer);
+    return -1;
+}
+
+
+
