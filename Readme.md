@@ -22,3 +22,5 @@ ExFat OpenSource :  https://github.com/relan/exfat
 
 
 Ext2 File System Manual : https://www.nongnu.org/ext2-doc/ext2.html
+
+ExFat File System Documentation : https://learn.microsoft.com/en-us/windows/win32/fileio/exfat-specification
