@@ -73,16 +73,30 @@ I have also implemeted a main interface. This interface provides a simplified, r
 
 Below is a render of my interface : 
 
-Welcome to exFAT CLI Tester
+# Welcome to exFAT CLI Tester
 
-Commands:
-  mount <fs_image>        - Mount an exFAT file system
-  open <filename>         - Open a file or directory
-  read <fd> <size>        - Read bytes from an open file
-  getdents <fd> <dummy>   - List directory entries (reads one entry at a time)
-  close <fd>              - Close an open file
-  unmount                 - Unmount the file system
-  exit                    - Exit the program
+**Commands:**
+
+- `mount <fs_image>`  
+  Mount an exFAT file system
+
+- `open <filename>`  
+  Open a file or directory
+
+- `read <fd> <size>`  
+  Read bytes from an open file
+
+- `getdents <fd> <dummy>`  
+  List directory entries (reads one entry at a time)
+
+- `close <fd>`  
+  Close an open file
+
+- `unmount`  
+  Unmount the file system
+
+- `exit`  
+  Exit the program
 
 
 it can be accessed after running the following after the make command :
