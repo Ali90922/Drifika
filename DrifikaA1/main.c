@@ -124,6 +124,7 @@ int main(void)
         else if (strncmp(cmd_ptr, "getdents", 8) == 0)
         {
             // For the professor's ls: ignore the dummy count and read one entry at a time.
+            // Need to follow the professor's version of the ls -
             if (sscanf(cmd_ptr, "getdents %d %zu", &fd, &dummy) == 2)
             {
                 ssize_t dirents_read;

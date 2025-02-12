@@ -12,6 +12,7 @@ static FILE *fs_image = NULL; // File pointer for the file system image
 static int is_mounted = 0;    // Flag to indicate if the FS is mounted
 static main_boot_record mbr;  // Stores the Main Boot Record data
 
+// Open File Table(OFT) :
 typedef struct
 {
     int in_use;
