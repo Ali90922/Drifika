@@ -6,7 +6,7 @@
 
 ## Overview
 
-This project implements a read-only exFAT file system interface that mimics many aspects of the POSIX file system API. The goal of the assignment is to support basic file system operations on an exFAT-formatted disk image. The implementation includes functions to mount and unmount the file system, open files, read file data, list directory entries, and retrieve file sizes. In addition, a simple open file table (OFT) has been implemented to allow multiple files to be accessed simultaneously.
+This Assugnment implements a read-only exFAT file system interface that mimics many aspects of the POSIX file system API. The goal of the assignment is to support basic file system operations on an exFAT-formatted disk image. The implementation includes functions to mount and unmount the file system, open files, read file data, list directory entries, and retrieve file sizes. In addition, a simple open file table (OFT) has been implemented to allow multiple files to be accessed simultaneously.
 
 The interface defined in the header file `nqp_io.h` is used throughout the code, while exFAT-specific types and constants are provided in `nqp_exfat_types.h`. A main interface (entry point) has been created to demonstrate and test the implemented functions.
 
