@@ -47,10 +47,12 @@ int main( int argc, char **argv )
     {
         fd = open( argv[1], O_RDONLY );
         
+        // Jumps 1024 Bytes in - to get to the superblock
         /** Read individual properties from the superblock into variables. */
         lseek( fd, 1024 /* or 0x400*/, SEEK_SET );
-        read( fd, &inode_count, 4 );
-        read( fd, &block_count, sizeof(uint32_t) );
+        // Study the formatting of the SuperBlock cuz we are just fetching data from the formating
+        read( fd, &inode_count, 4 ); // read the first four bytes - which represent the I node count. 
+        read( fd, &block_count, sizeof(uint32_t) );  
         
         lseek( fd, 48, SEEK_CUR ); // <-- this is useful when iterating over
                                    //     tables of structures (e.g., inodes
