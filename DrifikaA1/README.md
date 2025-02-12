@@ -69,5 +69,28 @@ Please Ensure the file sstem image(Drifika.img) and the target files or director
 
 
 
+I have also implemeted a main interface. This interface provides a simplified, read-only API for interacting with exFAT-formatted disk images, similar to common POSIX file system calls. It includes functions for mounting (nqp_mount) and unmounting (nqp_unmount) the file system, opening files (nqp_open), reading file data (nqp_read), listing directory entries (nqp_getdents), and retrieving file sizes (nqp_size). To handle the unique aspects of exFAT—such as 16-bit Unicode filenames and cluster-based data storage—the interface incorporates utility functions like unicode2ascii and maintains a minimal open file table for managing multiple file accesses simultaneously. This design enables utility programs like cat, ls, and paste to interact with the file system image in an efficient and straightforward manner.
+
+Below is a render of my interface : 
+
+Welcome to exFAT CLI Tester
+
+Commands:
+  mount <fs_image>        - Mount an exFAT file system
+  open <filename>         - Open a file or directory
+  read <fd> <size>        - Read bytes from an open file
+  getdents <fd> <dummy>   - List directory entries (reads one entry at a time)
+  close <fd>              - Close an open file
+  unmount                 - Unmount the file system
+  exit                    - Exit the program
+
+
+it can be accessed after running the following after the make command :
+```bash
+./main
+```
+
+
+
 
 
