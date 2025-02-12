@@ -555,13 +555,18 @@ ssize_t nqp_getdents(int fd, void *dirp, size_t count)
         return 0;
 }
 
+// These below functions are not part of the assignment -- just some helper functions which I have implemented on my own, t
+// These do not interfere witht he functionality of the above 5 implemented functions in the assignment, and the stock version of
+// the cat.c, ls.c and paste.c program will work with my implementation of the above 5 functions!
+
 // Problems :
 
 // 1. Problems while accessing/ opening/ reading Nested Files -- Fix it -- Problem Fixed
 // Above Problem is with not having the appropriate file extensions -- properly name ur files like .md or .txt extensions
 
-// Problems wiht this function -- Better idea to implement an OFT
-// This function is trash -- come back to this
+// Problems wiht this function -- Better idea to implement an OFT    --- OFT is Implemented -- OFT helper functions also implemented
+
+// This function is trash - I don't need this at all now that I have the OFT implemeted
 int nqp_size(int fd)
 {
     if (fd < 2) // Invalid file descriptor (should be a valid cluster number)

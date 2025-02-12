@@ -191,7 +191,7 @@ typedef struct ENTRY_SET
 /*
 
 The FAT Table (File Allocation Table) is a map that tracks which clusters are used in the Cluster Heap and how they are linked.
-✅ What is Stored in the FAT Table?
+ What is Stored in the FAT Table?
 Cluster status: Whether a cluster is used, free, or the end of a file.
 Cluster linking: The next cluster in a file’s chain (if the file spans multiple clusters).
 End-of-File markers (EOF): Indicates the last cluster of a file.
