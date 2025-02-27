@@ -77,7 +77,14 @@ strace ./basic-io
 ----------------------
 
 This program gives us a chance to see how a process can ask for another process
-to be created using the `fork` system call.
+to be created using the `fork` system call, and how to ask for the code segment
+for a process to be replaced using the `exec` family of calls (specifically in
+our case `execvp`).
+
+This program also introduces the idea of synchronization using the `wait` family
+of system calls, specifically in our case `waitpid`. The parent process in this
+example will not proceed to continue doing work until after the child process
+has fully exited.
 
 You can run this program on the command line:
 
@@ -85,16 +92,25 @@ You can run this program on the command line:
 ./process-management
 ```
 
-As published, this will only block once (well, twice) *after* the call to
-`fork`.
+As published, this will only block once *per process* (so twice in total)
+after the call to `fork` (once for the `getchar()` in the child process, once
+for the `waitpid` in the parent process).
 
 After we call `fork`, you can see that there are two processes running using the
 `ps` program (again, `ps a`).
 
-You can press Enter on your keyboard to unblock the processes (press it *twice*
-to unblock both).
+You can press Enter on your keyboard to unblock the processes. At this point the
+child process will unblock (it was blocked on `getchar()`), ask the OS to
+replace its code segment with the code segment for `cat`, `cat` will then print
+out the contents of `process-management.c`, and then exit. Upon exiting, the
+parent process will unblock from `waitpid`, print some stuff, then finally exit.
 
 Notice how we're declaring a stack allocated variable (`letter`), assigning it
 the value of `w` in the initial process. In the child process (the process where
 `0` is returned from `fork`) we change the value of `letter` to `c`, but this
 *only* affects the child process.
+
+Notice further that now that we're calling `waitpid`, we can **guarantee** the
+order of output from this program where we were not able to guarantee the order
+of output from the program when we just allowed both processes to run to
+completion without blocking (or even with blocking with `getchar()`).
