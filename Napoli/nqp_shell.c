@@ -8,9 +8,15 @@
 
 
 // Tasks 
+
+// Built In Tasks :
 // 1 . Implement ls -- Function Copied over from the last assignment and adjusted as needed -- DONE
 // 2 pwd . -- Used the global variable for this and just need to print it    -- DONE
-// 3 -- CD -- Need to implement change of current working directory -- look at code from the earlier assignment !
+// 3 -- CD -- Need to implement change of current working directory -- look at code from the earlier assignment ! -- DONE
+
+// Launch Process Tasks : 
+
+
 
 // Global variable for current working directory (cwd)
 char cwd[MAX_LINE_SIZE] = "/";
