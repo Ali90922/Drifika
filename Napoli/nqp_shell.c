@@ -100,7 +100,7 @@ void handle_ls() {
     ssize_t dirents_read;
     fd = nqp_open(cwd);
     if (fd == NQP_FILE_NOT_FOUND){
-                fprintf(stderr, "%s not found\n", argv[2]);
+                fprintf(stderr, "%s not found\n", cwd);
             }else
             {
                 while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
