@@ -8,7 +8,6 @@ cat.o
 ls.o
 main
 main.o
-nqp_exfat.o
 paste
 paste.o
 
