@@ -102,6 +102,12 @@ void handle_pwd() {
 
 
 void handle_cd(char *dir){
+    char path_copy[256];
+    strncpy(path_copy, dir, sizeof(path_copy)); // Copy into char
+    char *token = strtok(path_copy, "/"); // Tokenization
+    if(nqp_open()!= -1){
+        cwd = path_copy;
+    }
 }
 
 // ==========================
