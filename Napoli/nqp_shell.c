@@ -22,6 +22,7 @@ int main( int argc, char *argv[], char *envp[] )
         exit( EXIT_FAILURE );
     }
 
+   // Mount exFAT filesystem
     mount_error = nqp_mount( argv[1], NQP_FS_EXFAT );
 
     if ( mount_error != NQP_OK )
@@ -37,12 +38,13 @@ int main( int argc, char *argv[], char *envp[] )
     volume_label = nqp_vol_label( );
 
     printf( "%s:\\> ", volume_label );
-    while ( fgets( line_buffer, MAX_LINE_SIZE, stdin ) != NULL )
-    {
-
-
-        printf( "%s:\\> ", volume_label );
-    }
+    // Shell loop
+    while (1) {
+        printf("%s:\\> ", cwd); // Display prompt
+        if (fgets(line_buffer, MAX_LINE_SIZE, stdin) == NULL) {
+            printf("\nExiting shell...\n");
+            break;
+        }
 
     return EXIT_SUCCESS;
 }
