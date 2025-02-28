@@ -66,13 +66,7 @@ int main(int argc, char *argv[], char *envp[]) {
             printf("Exiting shell...\n");
             break;
         } 
-        else if (strcmp(args[0], "cd") == 0) {
-            if (arg_count < 2) {
-                fprintf(stderr, "cd: missing argument\n");
-            } else {
-                handle_cd(args[1]); // Call cd function
-            }
-        } 
+        
         else if (strcmp(args[0], "pwd") == 0) {
             handle_pwd(); // Call pwd function
         } 
@@ -87,13 +81,7 @@ int main(int argc, char *argv[], char *envp[]) {
     return EXIT_SUCCESS;
 }
 
-// ==========================
-// 🔹 `cd` Implementation
-// ==========================
-void handle_cd(char *dir) {
-     void(dir)
 
-}
 
 // ==========================
 // 🔹 `pwd` Implementation
