@@ -91,27 +91,7 @@ int main(int argc, char *argv[], char *envp[]) {
 // 🔹 `cd` Implementation
 // ==========================
 void handle_cd(char *dir) {
-    if (strcmp(dir, "..") == 0) {
-        // Handle "cd .." (move to parent)
-        if (strcmp(cwd, "/") != 0) {
-            char *last_slash = strrchr(cwd, '/');
-            if (last_slash != NULL) {
-                *last_slash = '\0';
-                if (strlen(cwd) == 0) strcpy(cwd, "/");
-            }
-        }
-    } 
-    else {
-        // Handle "cd dir" (move into directory)
-        char new_path[MAX_LINE_SIZE];
-        snprintf(new_path, sizeof(new_path), "%s/%s", cwd, dir);
 
-        if (nqp_is_directory(new_path)) {
-            strcpy(cwd, new_path);  // Update cwd
-        } else {
-            fprintf(stderr, "%s: Directory not found or not a directory\n", dir);
-        }
-    }
 }
 
 // ==========================
