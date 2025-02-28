@@ -95,7 +95,6 @@ void handle_pwd() {
 // ==========================
 void handle_ls() {
     nqp_dirent entry = {0};
-    nqp_error err;
     int fd;
     ssize_t dirents_read;
     fd = nqp_open(cwd);
