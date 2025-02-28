@@ -125,5 +125,4 @@ void handle_pwd() {
 // 🔹 `ls` Implementation (Uses `ls.c` From Assignment 1)
 // ==========================
 void handle_ls() {
-    nqp_ls(cwd); // Assuming `nqp_ls()` is implemented in `ls.c`
 }
