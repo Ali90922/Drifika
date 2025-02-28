@@ -78,7 +78,9 @@ int main(int argc, char *argv[], char *envp[]) {
         } 
         else if (strcmp(args[0], "ls") == 0) {
             handle_ls(); // Call ls function (uses Assignment 1's `ls.c`)
-        } 
+        }
+        else if(strcmp(args[0], "cd") == 0){
+            handle_cd(args[1]);
         else {
             printf("Unknown command: %s\n", args[0]);
         }
@@ -94,6 +96,11 @@ int main(int argc, char *argv[], char *envp[]) {
 // ==========================
 void handle_pwd() {
     printf("%s\n", cwd);
+}
+
+
+
+void handle_cd(args[1]){
 }
 
 // ==========================
