@@ -46,6 +46,43 @@ int main( int argc, char *argv[], char *envp[] )
             break;
         }
     line_buffer[strcspn(line_buffer, "")] = '\0';
+    // Tokenize input
+        char *token = strtok(line_buffer, " ");
+        int arg_count = 0;
+
+        while (token != NULL && arg_count < MAX_ARGS - 1) {
+            args[arg_count++] = token;
+            token = strtok(NULL, " ");
+        }
+        args[arg_count] = NULL;  // Null-terminate argument list
+
+        // Handle empty input
+        if (arg_count == 0) continue;
+
+        // ==========================
+        // 🔥 Built-in Commands
+        // ==========================
+        if (strcmp(args[0], "exit") == 0) {
+            printf("Exiting shell...\n");
+            break;
+        } 
+        else if (strcmp(args[0], "cd") == 0) {
+            if (arg_count < 2) {
+                fprintf(stderr, "cd: missing argument\n");
+            } else {
+                handle_cd(args[1]); // Call cd function
+            }
+        } 
+        else if (strcmp(args[0], "pwd") == 0) {
+            handle_pwd(); // Call pwd function
+        } 
+        else if (strcmp(args[0], "ls") == 0) {
+            handle_ls(); // Call ls function (uses Assignment 1's `ls.c`)
+        } 
+        else {
+            printf("Unknown command: %s\n", args[0]);
+        }
+    }
 }
     return EXIT_SUCCESS;
 }
