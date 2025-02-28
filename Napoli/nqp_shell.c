@@ -25,6 +25,7 @@ char cwd[MAX_LINE_SIZE] = "/";
 void handle_cd(char *dir);
 void handle_pwd();
 void handle_ls();
+void LaunchFunction(char *Argument1, char *Argument2);
 
 int main(int argc, char *argv[], char *envp[]) {
     char line_buffer[MAX_LINE_SIZE] = {0};
@@ -89,7 +90,7 @@ int main(int argc, char *argv[], char *envp[]) {
             handle_cd(args[1]);
         }
         else {
-            printf("Unknown command: %s\n", args[0]);
+            LaunchFunction(args[0],args[1]);
         }
     }
 
@@ -149,6 +150,8 @@ void handle_ls() {
 
                 nqp_close(fd);
             }
-    
-    
+}
+
+LaunchFunction(char *Argument1, char *Argument2){
+// Argument 1 is the filename of the command that needs to be executed and Argument 2 is the Argument for the command!    
 }
