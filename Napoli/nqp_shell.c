@@ -101,7 +101,7 @@ void handle_pwd() {
 
 
 
-void handle_cd(args[1]){
+void handle_cd(char *dir){
 }
 
 // ==========================
