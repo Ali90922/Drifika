@@ -106,7 +106,7 @@ void handle_cd(char *dir){
     strncpy(path_copy, dir, sizeof(path_copy)); // Copy into char
     //char *token = strtok(path_copy, "/"); // Tokenization
     if(nqp_open(dir)!= -1){
-        cwd = path_copy;
+        strcpy(cwd, path_copy);
     }
 }
 
