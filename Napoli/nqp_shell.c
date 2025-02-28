@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "nqp_io.h"
-
+#include <string.h>
 
 
 // Tasks : 
@@ -40,11 +40,12 @@ int main( int argc, char *argv[], char *envp[] )
     printf( "%s:\\> ", volume_label );
     // Shell loop
     while (1) {
-        printf("%s:\\> ", cwd); // Display prompt
+        printf("%s:\\> ", volume_label); // Display prompt
         if (fgets(line_buffer, MAX_LINE_SIZE, stdin) == NULL) {
             printf("\nExiting shell...\n");
             break;
         }
-
+    line_buffer[strcspn(line_buffer, "")] = '\0';
+}
     return EXIT_SUCCESS;
 }
