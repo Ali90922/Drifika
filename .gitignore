@@ -1,8 +1,6 @@
 .DS_Store
 
 
-# Ignore all object files
-*.o
 
 # Ignore executables (if they are always built from source)
 ls
