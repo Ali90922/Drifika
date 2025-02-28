@@ -91,7 +91,7 @@ int main(int argc, char *argv[], char *envp[]) {
 // 🔹 `cd` Implementation
 // ==========================
 void handle_cd(char *dir) {
-     *z = dir;
+     void(dir)
 
 }
 
