@@ -94,4 +94,32 @@ void handle_pwd() {
 // 🔹 `ls` Implementation (Uses `ls.c` From Assignment 1)
 // ==========================
 void handle_ls() {
+    fd = nqp_open(cwd);
+    if (fd == NQP_FILE_NOT_FOUND){
+                fprintf(stderr, "%s not found\n", argv[2]);
+            }else
+            {
+                while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
+                {
+                    printf("%lu %s", entry.inode_number, entry.name);
+
+                    if (entry.type == DT_DIR)
+                    {
+                        putchar('/');
+                    }
+
+                    putchar('\n');
+
+                    free(entry.name);
+                }
+
+                if (dirents_read == -1)
+                {
+                    fprintf(stderr, "%s is not a directory\n", argv[2]);
+                }
+
+                nqp_close(fd);
+            }
+    
+    
 }
