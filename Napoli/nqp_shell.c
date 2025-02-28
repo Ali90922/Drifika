@@ -2,6 +2,11 @@
 #include <stdlib.h>
 #include "nqp_io.h"
 
+
+
+// Tasks : 
+//  1. Implement ls 
+
 int main( int argc, char *argv[], char *envp[] )
 {
 #define MAX_LINE_SIZE 256
