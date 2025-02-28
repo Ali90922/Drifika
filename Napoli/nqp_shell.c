@@ -94,7 +94,11 @@ void handle_pwd() {
 // 🔹 `ls` Implementation (Uses `ls.c` From Assignment 1)
 // ==========================
 void handle_ls() {
-    int fd = nqp_open(cwd);
+    nqp_dirent entry = {0};
+    nqp_error err;
+    int fd;
+    ssize_t dirents_read;
+    fd = nqp_open(cwd);
     if (fd == NQP_FILE_NOT_FOUND){
                 fprintf(stderr, "%s not found\n", argv[2]);
             }else
