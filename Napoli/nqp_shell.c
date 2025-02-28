@@ -119,7 +119,7 @@ void handle_ls() {
 
                 if (dirents_read == -1)
                 {
-                    fprintf(stderr, "%s is not a directory\n", argv[2]);
+                    fprintf(stderr, "%s is not a directory\n", cwd);
                 }
 
                 nqp_close(fd);
