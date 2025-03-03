@@ -152,6 +152,22 @@ void handle_ls() {
             }
 }
 
+/*
+Your shell should be able to launch the programs that are installed on the volume that has been provided. The OS that our shell is running on actually has no idea how to read data (including programs!) out of the volume unless we mount-ed the volume for realsies, but neither me (Franklin) nor you (student) have permission to mount volumes on shared systems like Aviary.
+
+We are going to be using POSIX system calls (ones that would run on macOS, Linux, Solaris, etc) like fork and wait and also Linux-specific system calls (ones that only run on Linux) like memfd_create and fexecve.
+
+Your shell should be able to take a command that has been entered, find the corresponding command in the current working directory, read that command into memory (using memfd_create and both nqp_open and nqp_read), then execute that command (using a combination of fork and fexecve).
+
+From the root directory of the volume, we should able to run the following command and see the following output:
+
+3430:\> echo "Hi!"
+Hi!
+3430:\> _
+
+
+*/
+
 LaunchFunction(char *Argument1, char *Argument2){
 // Argument 1 is the filename of the command that needs to be executed and Argument 2 is the Argument for the command!    
 }
