@@ -78,9 +78,6 @@ int main(int argc, char *argv[], char *envp[]) {
         // Handle empty input
         if (arg_count == 0) continue;
 
-        // ==========================
-        // 🔥 Built-in Commands
-        // ==========================
         if (strcmp(args[0], "exit") == 0) {
             printf("Exiting shell...\n");
             break;
@@ -105,9 +102,6 @@ int main(int argc, char *argv[], char *envp[]) {
 
 
 
-// ==========================
-// 🔹 `pwd` Implementation
-// ==========================
 void handle_pwd() {
     printf("%s\n", cwd);
 }
@@ -123,9 +117,7 @@ void handle_cd(char *dir){
     }
 }
 
-// ==========================
-// 🔹 `ls` Implementation (Uses `ls.c` From Assignment 1)
-// ==========================
+
 void handle_ls() {
     nqp_dirent entry = {0};
     int fd;
@@ -198,13 +190,17 @@ void LaunchFunction(char *Argument1, char *Argument2){
     ssize_t bytes_written = 0;
     char buffer[BUFFER_SIZE];
 
-    while (bytes_read = nqp_read(FileDescriptor, buffer, BUFFER_SIZE)) > 0){
-    
+    while ((bytes_read = nqp_read(FileDescriptor, buffer, BUFFER_SIZE)) > 0) {
+    bytes_written = write(InMemoryFile, buffer, bytes_read);
+    if (bytes_written != bytes_read) {
+        fprintf(stderr, "Error writing to in-memory file\n");
+        // Handle error (e.g., exit or clean up)
+    }
 }
+if (bytes_read < 0) {
+    fprintf(stderr, "Error reading the source file\n");
+    // Handle error
 }
 
-
-
-
-
+}
 
