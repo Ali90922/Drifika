@@ -201,6 +201,12 @@ if (bytes_read < 0) {
     fprintf(stderr, "Error reading the source file\n");
     // Handle error
 }
+    pid_t pid = fork();
+    if(pid == -1){
+       // Error handling
+    perror("fork");
+    return;
+}
 
 }
 
