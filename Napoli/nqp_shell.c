@@ -1,10 +1,11 @@
+#define _GNU_SOURCE
+#include <sys/mman.h> // Include for memfd_create and MFD_CLOEXEC
+#include <unistd.h> //include for memfd_create
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "nqp_io.h"
 
-#include <sys/mman.h>
-#include <unistd.h>
 
 
 #define MAX_LINE_SIZE 256
@@ -189,7 +190,7 @@ void LaunchFunction(char *Argument1, char *Argument2){
     char* name4 = tempName;
 
     // memfd_create is a Linux system call that creates an anonymous file in memory and returns a file descriptor that refers to it. This file exists only in RAM and is not associated with any file in the filesystem. This is particularly useful for sharing memory between processes or for creating temporary files that don't need to persist on disk.
-    int InMemoryFile = memfd_create(const char *name4, MFD_CLOEXEC);
+    int InMemoryFile = memfd_create(name4, MFD_CLOEXEC);
 
     // Read the bytes of that file into the In-Memory File
     
