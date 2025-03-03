@@ -173,7 +173,8 @@ void LaunchFunction(char *Argument1, char *Argument2){
 // Argument 1 is the filename of the command that needs to be executed and Argument 2 is the Argument for the command!
     if(strcmp(cwd, "/") == 0){
         FileDescriptor = nqp_open(Argument1);
-        
+        printf("File Descriptor: %d\n", FileDescriptor);
+
     }else{
         // Have to find the append the filename to the CWD filepath -- and then call NQP-Open!
             
@@ -220,3 +221,4 @@ if (bytes_read < 0) {
 
 }
 
+1
