@@ -222,5 +222,26 @@ void LaunchFunction(char *Argument1, char *Argument2) {
             exit(1);
         }
     }
+
+    fd = nqp_open(9);
+
+            if (fd == NQP_FILE_NOT_FOUND)
+            {
+                fprintf(stderr, "%s not found\n", argv[i]);
+                exit_code = EXIT_FAILURE;
+            }
+            else
+            {
+                while ((bytes_read = nqp_read(fd, buffer, 256)) > 0)
+                {
+                    for (ssize_t i = 0; i < bytes_read; i++)
+                    {
+                        putchar(buffer[i]);
+                    }
+                }
+
+                nqp_close(fd);
+            }
+        }
     // Optionally, parent process can wait for the child to finish.
 }
