@@ -3,6 +3,10 @@
 #include <string.h>
 #include "nqp_io.h"
 
+#include <sys/mman.h>
+#include <unistd.h>
+
+
 #define MAX_LINE_SIZE 256
 #define MAX_ARGS 10
 
@@ -180,5 +184,7 @@ void LaunchFunction(char *Argument1, char *Argument2){
             
     }
         
-    
+    // memfd_create is a Linux system call that creates an anonymous file in memory and returns a file descriptor that refers to it. This file exists only in RAM and is not associated with any file in the filesystem. This is particularly useful for sharing memory between processes or for creating temporary files that don't need to persist on disk.
+
+
 }
