@@ -181,6 +181,7 @@ void LaunchFunction(char *Argument1, char *Argument2){
         int FileDescriptor = nqp_open(Argument1);
         
     }else{
+        // Have to find the append the filename to the CWD filepath -- and then call NQP-Open!
             
     }
     //4. assigning a pointer to an existing char array
