@@ -168,6 +168,14 @@ Hi!
 
 */
 
-LaunchFunction(char *Argument1, char *Argument2){
-// Argument 1 is the filename of the command that needs to be executed and Argument 2 is the Argument for the command!    
+void LaunchFunction(char *Argument1, char *Argument2){
+    int FD = 0;
+// Argument 1 is the filename of the command that needs to be executed and Argument 2 is the Argument for the command!
+    if(char cwd == "/"){
+        FD = nqp_open(Argument1);
+    }else{
+            
+    }
+        
+    
 }
