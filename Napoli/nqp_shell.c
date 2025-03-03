@@ -193,6 +193,13 @@ void LaunchFunction(char *Argument1, char *Argument2){
     int InMemoryFile = memfd_create(name4, MFD_CLOEXEC);
 
     // Read the bytes of that file into the In-Memory File
+    ssize_t bytes_read = 0;
     
 
 }
+
+
+
+
+
+
