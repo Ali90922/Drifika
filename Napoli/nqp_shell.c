@@ -8,6 +8,7 @@
 
 
 
+#define BUFFER_SIZE 1024
 #define MAX_LINE_SIZE 256
 #define MAX_ARGS 10
 
@@ -194,8 +195,12 @@ void LaunchFunction(char *Argument1, char *Argument2){
 
     // Read the bytes of that file into the In-Memory File
     ssize_t bytes_read = 0;
-    
+    ssize_t bytes_written = 0;
+    char buffer[BUFFER_SIZE];
 
+    while (bytes_read = nqp_read(FileDescriptor, buffer, BUFFER_SIZE)) > 0){
+    
+}
 }
 
 
