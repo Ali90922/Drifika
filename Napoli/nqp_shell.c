@@ -207,6 +207,16 @@ if (bytes_read < 0) {
     perror("fork");
     return;
 }
+   if(pid ==0){ 
+     // Child Process -- Execute that File using fexeve!
+     char *envp[] = {NULL}; // Empty environment
+     char *argv[] = {Argument2};
+     if(fexecve(InMemoryFile,argv,envp)==-1){
+       perror("fexecve");
+       exit(1);
+}
+
+}
 
 }
 
