@@ -169,13 +169,12 @@ Hi!
 */
 
 void LaunchFunction(char *Argument1, char *Argument2){
-    int FD = 0;
     char path_copy[256];
     strncpy(path_copy, Argument2, sizeof(path_copy)); // Copy into char
     
 // Argument 1 is the filename of the command that needs to be executed and Argument 2 is the Argument for the command!
-    if(cwd == "/"){
-        FD = nqp_open(Argument1);
+    if(strcmp(cwd, "/") == 0){
+        int FileDescriptor = nqp_open(Argument1);
         
     }else{
             
