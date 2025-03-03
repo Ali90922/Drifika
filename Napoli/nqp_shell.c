@@ -166,59 +166,60 @@ Hi!
 
 */
 
-void LaunchFunction(char *Argument1, char *Argument2){
-    char path_copy[256];
-    strncpy(path_copy, Argument2, sizeof(path_copy)); // Copy into char
+void LaunchFunction(char *Argument1, char *Argument2) {
     int FileDescriptor = 0;
-// Argument 1 is the filename of the command that needs to be executed and Argument 2 is the Argument for the command!
-    if(strcmp(cwd, "/") == 0){
+
+    // Open the file for the command (assuming cwd is "/" for now)
+    if (strcmp(cwd, "/") == 0) {
         FileDescriptor = nqp_open(Argument1);
         printf("File Descriptor: %d\n", FileDescriptor);
-
-    }else{
-        // Have to find the append the filename to the CWD filepath -- and then call NQP-Open!
-            
+    } else {
+        // Append filename to cwd and then open, if necessary.
     }
-    //4. assigning a pointer to an existing char array
-    char tempName[] = "In-Memory-File";
-    char* name4 = tempName;
 
-    // memfd_create is a Linux system call that creates an anonymous file in memory and returns a file descriptor that refers to it. This file exists only in RAM and is not associated with any file in the filesystem. This is particularly useful for sharing memory between processes or for creating temporary files that don't need to persist on disk.
-    int InMemoryFile = memfd_create(name4, MFD_CLOEXEC);
-    printf("File Descriptor for the In Memory file Created: %d\n", InMemoryFile);
+    // Create an in-memory file descriptor
+    int InMemoryFile = memfd_create("In-Memory-File", MFD_CLOEXEC);
+    if (InMemoryFile == -1) {
+        perror("memfd_create");
+        return;
+    }
 
-    // Read the bytes of that file into the In-Memory File
-    ssize_t bytes_read = 0;
-    ssize_t bytes_written = 0;
+    // Read bytes from the source file and write them into the in-memory file
+    ssize_t bytes_read, bytes_written;
     char buffer[BUFFER_SIZE];
-
     while ((bytes_read = nqp_read(FileDescriptor, buffer, BUFFER_SIZE)) > 0) {
-    bytes_written = write(InMemoryFile, buffer, bytes_read);
-    if (bytes_written != bytes_read) {
-        fprintf(stderr, "Error writing to in-memory file\n");
-        // Handle error (e.g., exit or clean up)
+        bytes_written = write(InMemoryFile, buffer, bytes_read);
+        if (bytes_written != bytes_read) {
+            fprintf(stderr, "Error writing to in-memory file\n");
+            // Handle error appropriately
+        }
     }
-}
-if (bytes_read < 0) {
-    fprintf(stderr, "Error reading the source file\n");
-    // Handle error
-}
+    if (bytes_read < 0) {
+        fprintf(stderr, "Error reading the source file\n");
+        // Handle error appropriately
+    }
+
+    // IMPORTANT: Reset the file offset to the beginning before fexecve
+    if (lseek(InMemoryFile, 0, SEEK_SET) == -1) {
+        perror("lseek");
+        return;
+    }
+
+    // Fork and execute the command using fexecve in the child process
     pid_t pid = fork();
-    if(pid == -1){
-       // Error handling
-    perror("fork");
-    return;
+    if (pid == -1) {
+        perror("fork");
+        return;
+    }
+    if (pid == 0) {
+        // Child Process
+        char *envp[] = { NULL };
+        // Construct argv; typically, argv[0] is the program name
+        char *argv[] = { Argument1, Argument2, NULL };
+        if (fexecve(InMemoryFile, argv, envp) == -1) {
+            perror("fexecve");
+            exit(1);
+        }
+    }
+    // Optionally, parent process can wait for the child to finish.
 }
-   if(pid ==0){ 
-     // Child Process -- Execute that File using fexeve!
-     char *envp[] = {NULL}; // Empty environment
-     char *argv[] = {Argument2, NULL};
-     if(fexecve(InMemoryFile,argv,envp)==-1){
-       perror("fexecve");
-       exit(1);
-}
-
-}
-
-}
-
