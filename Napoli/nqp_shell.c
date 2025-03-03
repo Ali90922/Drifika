@@ -172,7 +172,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
     // Open the file for the command (assuming cwd is "/" for now)
     if (strcmp(cwd, "/") == 0) {
         FileDescriptor = nqp_open(Argument1);
-        printf("File Descriptor: %d\n", FileDescriptor);
+        printf("File Descriptor is : %d\n", FileDescriptor);
     } else {
         // Append filename to cwd and then open, if necessary.
     }
@@ -215,9 +215,9 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         // Child Process
         char *envp[] = { NULL };
         // Construct argv; typically, argv[0] is the program name
-        char *argv[] = { Argument1, Argument2, NULL };
+        char *argv[] = { Argument2, NULL };
         lseek(InMemoryFile, 0, SEEK_SET);
-        if (fexecve(InMemoryFile, argv, envp) == -1) {
+        if (fexecve(9, argv, envp) == -1) {
             perror("fexecve");
             exit(1);
         }
