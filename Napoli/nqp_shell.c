@@ -216,6 +216,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         char *envp[] = { NULL };
         // Construct argv; typically, argv[0] is the program name
         char *argv[] = { Argument1, Argument2, NULL };
+        lseek(InMemoryFile, 0, SEEK_SET);
         if (fexecve(InMemoryFile, argv, envp) == -1) {
             perror("fexecve");
             exit(1);
