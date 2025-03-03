@@ -183,8 +183,14 @@ void LaunchFunction(char *Argument1, char *Argument2){
     }else{
             
     }
-        
-    // memfd_create is a Linux system call that creates an anonymous file in memory and returns a file descriptor that refers to it. This file exists only in RAM and is not associated with any file in the filesystem. This is particularly useful for sharing memory between processes or for creating temporary files that don't need to persist on disk.
+    //4. assigning a pointer to an existing char array
+    char tempName[] = "In-Memory-File";
+    char* name4 = tempName;
 
+    // memfd_create is a Linux system call that creates an anonymous file in memory and returns a file descriptor that refers to it. This file exists only in RAM and is not associated with any file in the filesystem. This is particularly useful for sharing memory between processes or for creating temporary files that don't need to persist on disk.
+    int InMemoryFile = memfd_create(const char *name4, MFD_CLOEXEC);
+
+    // Read the bytes of that file into the In-Memory File
+    
 
 }
