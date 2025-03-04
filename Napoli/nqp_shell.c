@@ -246,6 +246,13 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         printf("Argument2: %s\n", Argument2);
         char *argv[] = { Argument1, Argument2, NULL };
 
+
+        fchmod(InMemoryFile, 0755);
+    // Reset the in-memory file offset (not FileDescriptor)
+    if (lseek(InMemoryFile, 0, SEEK_SET) == -1) {
+        perror("lseek");
+        exit(1);
+    }
         if (fexecve(InMemoryFile, argv, envp) == -1) {
             perror("fexecve");
             exit(1);
