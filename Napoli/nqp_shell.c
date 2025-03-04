@@ -170,7 +170,7 @@ Hi!
 
 void LaunchFunction(char *Argument1, char *Argument2) {
     int FileDescriptor = 0;
-
+    int Milan = 0;
     // Open the file for the command (assuming cwd is "/" for now)
     if (strcmp(cwd, "/") == 0) {
         FileDescriptor = nqp_open(Argument1);
@@ -193,7 +193,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
     // Read bytes from the source file and write them into the in-memory file
     ssize_t bytes_read, bytes_written;
     char buffer[BUFFER_SIZE];
-    while ((bytes_read = nqp_read(FileDescriptor, buffer, BUFFER_SIZE)) > 0) {
+    while ((bytes_read = nqp_read(Milan, buffer, BUFFER_SIZE)) > 0) {
         bytes_written = write(InMemoryFile, buffer, bytes_read);
         if (bytes_written != bytes_read) {
             fprintf(stderr, "Error writing to in-memory file\n");
@@ -226,7 +226,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         char *argv[] = {Argument1, Argument2, NULL };
         fchmod(InMemoryFile, 0755);
         lseek(InMemoryFile, 0, SEEK_SET);
-        if (fexecve(4, argv, envp) == -1) {
+        if (fexecve(InMemoryFile, argv, envp) == -1) {
             perror("fexecve");
             exit(1);
         }
