@@ -126,7 +126,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
     int exec_fd = 0;
     char abs_path[MAX_LINE_SIZE];
 
-    // Build the correct absolute path for the command.
+    // Build the absolute path for the command.
     if (strcmp(cwd, "/") == 0) {
         if (Argument1[0] != '/') {
             snprintf(abs_path, sizeof(abs_path), "/%s", Argument1);
@@ -152,10 +152,12 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         return;
     }
 
-    // Copy executable data from the source file into the in-memory file.
+    // Copy the executable data from the source file into the in-memory file.
     ssize_t bytes_read, bytes_written;
     char buffer[BUFFER_SIZE];
+    size_t total_bytes = 0;
     while ((bytes_read = nqp_read(exec_fd, buffer, BUFFER_SIZE)) > 0) {
+        total_bytes += bytes_read;
         bytes_written = write(InMemoryFile, buffer, bytes_read);
         if (bytes_written != bytes_read) {
             fprintf(stderr, "Error writing to in-memory file\n");
@@ -166,6 +168,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         fprintf(stderr, "Error reading the source file\n");
         return;
     }
+    printf("Total bytes read from source: %zu\n", total_bytes);
 
     // Set execute permissions on the in-memory file.
     if (fchmod(InMemoryFile, 0755) == -1) {
@@ -199,7 +202,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         return;
     }
 
-    // Fork and execute using fexecve.
+    // Fork and execute the command using fexecve.
     pid_t pid = fork();
     if (pid == -1) {
         perror("fork");
@@ -211,6 +214,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         printf("Argument1: %s\n", Argument1);
         printf("Argument2: %s\n", Argument2);
         char *argv[] = { Argument1, Argument2, NULL };
+
         if (fexecve(InMemoryFile, argv, envp) == -1) {
             perror("fexecve");
             exit(1);
