@@ -1,12 +1,16 @@
+
+#define _POSIX_C_SOURCE 200809L
 #define _GNU_SOURCE
-#include <sys/mman.h> // Include for memfd_create and MFD_CLOEXEC
-#include <unistd.h> //include for memfd_create
+
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/mman.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "nqp_io.h"
 #include <sys/stat.h>
-
 
 
 
@@ -228,6 +232,8 @@ void LaunchFunction(char *Argument1, char *Argument2) {
     }
 
     // Fork and execute the command using fexecve in the child process.
+    
+    // Problem with the File Format likely
     pid_t pid = fork();
     if (pid == -1) {
         perror("fork");
