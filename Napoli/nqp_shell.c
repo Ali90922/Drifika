@@ -221,7 +221,9 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         // Child Process
         char *envp[] = { NULL };
         // Construct argv; typically, argv[0] is the program name
-        char *argv[] = { Argument2, NULL };
+        printf("Argument1: %s\n", Argument1);
+        printf("Argument2: %s\n", Argument2);
+        char *argv[] = {Argument1, Argument2, NULL };
         fchmod(InMemoryFile, 0755);
         lseek(InMemoryFile, 0, SEEK_SET);
         if (fexecve(4, argv, envp) == -1) {
