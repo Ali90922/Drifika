@@ -127,7 +127,15 @@ void LaunchFunction(char *Argument1, char *Argument2) {
     char abs_path[MAX_LINE_SIZE];
 
     // Build the absolute path for the command.
-    snprintf(abs_path, sizeof(abs_path), "/%s", Argument1);
+    if (strcmp(cwd, "/") == 0) {
+        if (Argument1[0] != '/') {
+            snprintf(abs_path, sizeof(abs_path), "/%s", Argument1);
+        } else {
+            strncpy(abs_path, Argument1, sizeof(abs_path));
+        }
+    } else {
+        snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, Argument1);
+    }
 
     exec_fd = nqp_open(abs_path);
     if (exec_fd == NQP_FILE_NOT_FOUND) {
@@ -162,30 +170,59 @@ void LaunchFunction(char *Argument1, char *Argument2) {
     }
     printf("Total bytes read from source: %zu\n", total_bytes);
 
-    // Read first two bytes to detect if it's a shell script
-    char header[2];
-    lseek(InMemoryFile, 0, SEEK_SET);
-    read(InMemoryFile, header, 2);
-    lseek(InMemoryFile, 0, SEEK_SET);
+    // Set execute permissions on the in-memory file.
+    if (fchmod(InMemoryFile, 0755) == -1) {
+        perror("fchmod");
+        return;
+    }
+
+    // Reset the in-memory file offset before debugging.
+    if (lseek(InMemoryFile, 0, SEEK_SET) == -1) {
+        perror("lseek before header debug");
+        return;
+    }
+
+    // Debug: Read and print the first 16 bytes of the in-memory file.
+    unsigned char debug_header[16];
+    ssize_t n = read(InMemoryFile, debug_header, sizeof(debug_header));
+    if (n != sizeof(debug_header)) {
+        perror("read header");
+        return;
+    }
+    printf("In-memory file header: ");
+    for (size_t i = 0; i < sizeof(debug_header); i++) {
+        printf("%02x ", debug_header[i]);
+    }
+    printf("\n");
+    fflush(stdout);
+
+    // Reset offset again before execution.
+    if (lseek(InMemoryFile, 0, SEEK_SET) == -1) {
+        perror("lseek after header debug");
+        return;
+    }
 
     char *argv[] = { Argument1, Argument2, NULL };
     char *envp[] = { NULL };
 
-    // If the file starts with "#!", execute it via /bin/sh
-    if (header[0] == '#' && header[1] == '!') {
-        printf("Detected shell script, executing with /bin/sh\n");
-        argv[0] = "/bin/sh";
-        argv[1] = abs_path;
-        argv[2] = NULL;
+    // If the file starts with "#!", assume it's a shell script.
+    if (debug_header[0] == '#' && debug_header[1] == '!') {
+        // Build a path using /proc/self/fd so that the kernel can process the shebang.
+        char proc_path[256];
+        snprintf(proc_path, sizeof(proc_path), "/proc/self/fd/%d", InMemoryFile);
+        printf("Detected shell script, executing via execve on %s\n", proc_path);
+        fflush(stdout);
+        if (execve(proc_path, argv, envp) == -1) {
+            perror("execve");
+            exit(1);
+        }
+    } else {
+        // Otherwise, assume it's a proper ELF binary.
         if (fexecve(InMemoryFile, argv, envp) == -1) {
             perror("fexecve");
-            return;
+            exit(1);
         }
     }
-    else {
-        if (fexecve(InMemoryFile, argv, envp) == -1) {
-            perror("fexecve");
-            return;
-        }
-    }
+}
+}
 }
