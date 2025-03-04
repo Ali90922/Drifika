@@ -1,6 +1,4 @@
-#define _POSIX_C_SOURCE 200809L
-#define _GNU_SOURCE
-
+#include <fcntl.h>  // For mkstemp
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
@@ -18,7 +16,6 @@
 // Global variable for current working directory (cwd)
 char cwd[MAX_LINE_SIZE] = "/";
 
-// Function prototypes
 void handle_cd(char *dir);
 void handle_pwd();
 void handle_ls();
@@ -47,41 +44,33 @@ int main(int argc, char *argv[], char *envp[]) {
 
     // Shell loop
     while (1) {
-        printf("%s:\\> ", cwd); // Display prompt
+        printf("%s:\\> ", cwd);
         if (fgets(line_buffer, MAX_LINE_SIZE, stdin) == NULL) {
             printf("\nExiting shell...\n");
             break;
         }
-        // Remove newline character
         line_buffer[strcspn(line_buffer, "\n")] = '\0';
 
-        // Tokenize input
         char *token = strtok(line_buffer, " ");
         int arg_count = 0;
         while (token != NULL && arg_count < MAX_ARGS - 1) {
             args[arg_count++] = token;
             token = strtok(NULL, " ");
         }
-        args[arg_count] = NULL;  // Null-terminate argument list
-
-        // Handle empty input
+        args[arg_count] = NULL;
         if (arg_count == 0)
             continue;
 
         if (strcmp(args[0], "exit") == 0) {
             printf("Exiting shell...\n");
             break;
-        } 
-        else if (strcmp(args[0], "pwd") == 0) {
+        } else if (strcmp(args[0], "pwd") == 0) {
             handle_pwd();
-        } 
-        else if (strcmp(args[0], "ls") == 0) {
+        } else if (strcmp(args[0], "ls") == 0) {
             handle_ls();
-        }
-        else if (strcmp(args[0], "cd") == 0) {
+        } else if (strcmp(args[0], "cd") == 0) {
             handle_cd(args[1]);
-        }
-        else {
+        } else {
             LaunchFunction(args[0], args[1]);
         }
     }
@@ -182,7 +171,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         return;
     }
 
-    // Debug: Read and print the first 16 bytes of the in-memory file.
+    // Debug: Read and print the first 16 bytes.
     unsigned char debug_header[16];
     ssize_t n = read(InMemoryFile, debug_header, sizeof(debug_header));
     if (n != sizeof(debug_header)) {
@@ -218,6 +207,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
             exit(1);
         }
         // Do NOT unlink the temporary file; we need its name for execve.
+
         // Copy the entire content from the in-memory file to the temporary file.
         if (lseek(InMemoryFile, 0, SEEK_SET) == -1) {
             perror("lseek before copying to tmp");
@@ -238,7 +228,6 @@ void LaunchFunction(char *Argument1, char *Argument2) {
             perror("fchmod tmp file");
             exit(1);
         }
-        // Optionally, close the temporary file descriptor (the file remains on disk).
         close(tmp_fd);
 
         // Fork and execute using execve on the temporary file.
@@ -248,6 +237,11 @@ void LaunchFunction(char *Argument1, char *Argument2) {
             exit(1);
         }
         if (pid == 0) {
+            // Change the working directory to cwd so relative paths work.
+            if (chdir(cwd) == -1) {
+                perror("chdir");
+                exit(1);
+            }
             // Build the argv vector for the shell script.
             char *tmp_argv[] = { tmp_template, Argument2, NULL };
             if (execve(tmp_template, tmp_argv, envp) == -1) {
@@ -261,7 +255,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
             // unlink(tmp_template);
         }
     } else {
-        // Otherwise, assume it's a proper ELF binary and execute it using fexecve.
+        // Otherwise, assume it's a proper ELF binary.
         pid_t pid = fork();
         if (pid == -1) {
             perror("fork");
