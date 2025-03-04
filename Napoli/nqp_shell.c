@@ -176,7 +176,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         return;
     }
 
-    // Reset the in-memory file offset before debugging.
+    // Reset the in-memory file offset for header debugging.
     if (lseek(InMemoryFile, 0, SEEK_SET) == -1) {
         perror("lseek before header debug");
         return;
@@ -205,22 +205,80 @@ void LaunchFunction(char *Argument1, char *Argument2) {
     char *argv[] = { Argument1, Argument2, NULL };
     char *envp[] = { NULL };
 
-    // If the file starts with "#!", assume it's a shell script.
+    // Check if the file is a shell script by looking for "#!" at the start.
     if (debug_header[0] == '#' && debug_header[1] == '!') {
-        // Build a path using /proc/self/fd so that the kernel can process the shebang.
-        char proc_path[256];
-        snprintf(proc_path, sizeof(proc_path), "/proc/self/fd/%d", InMemoryFile);
-        printf("Detected shell script, executing via execve on %s\n", proc_path);
+        printf("Detected shell script, using temporary file workaround\n");
         fflush(stdout);
-        if (execve(proc_path, argv, envp) == -1) {
-            perror("execve");
+
+        // Create a temporary file.
+        char tmp_template[] = "/tmp/scriptXXXXXX";
+        int tmp_fd = mkstemp(tmp_template);
+        if (tmp_fd == -1) {
+            perror("mkstemp");
             exit(1);
         }
-    } else {
-        // Otherwise, assume it's a proper ELF binary.
-        if (fexecve(InMemoryFile, argv, envp) == -1) {
-            perror("fexecve");
+        // Unlink the temporary file so it will be removed when closed.
+        unlink(tmp_template);
+
+        // Copy the entire content from the in-memory file to the temporary file.
+        if (lseek(InMemoryFile, 0, SEEK_SET) == -1) {
+            perror("lseek before copying to tmp");
             exit(1);
+        }
+        while ((bytes_read = read(InMemoryFile, buffer, BUFFER_SIZE)) > 0) {
+            if (write(tmp_fd, buffer, bytes_read) != bytes_read) {
+                perror("write to tmp file");
+                exit(1);
+            }
+        }
+        if (bytes_read < 0) {
+            perror("read from in-memory file");
+            exit(1);
+        }
+        // Set execute permissions on the temporary file.
+        if (fchmod(tmp_fd, 0755) == -1) {
+            perror("fchmod tmp file");
+            exit(1);
+        }
+        // Reset temporary file offset.
+        if (lseek(tmp_fd, 0, SEEK_SET) == -1) {
+            perror("lseek tmp file");
+            exit(1);
+        }
+
+        // Fork and execute using execve on the temporary file.
+        pid_t pid = fork();
+        if (pid == -1) {
+            perror("fork");
+            exit(1);
+        }
+        if (pid == 0) {
+            // In the child process, build the argv vector for the shell script.
+            // Here we assume the temporary file itself is the script to be executed.
+            char *tmp_argv[] = { tmp_template, Argument2, NULL };
+            if (execve(tmp_template, tmp_argv, envp) == -1) {
+                perror("execve");
+                exit(1);
+            }
+        } else {
+            int status;
+            waitpid(pid, &status, 0);
+        }
+    } else {
+        // Otherwise, assume it's a proper ELF binary and execute it using fexecve.
+        pid_t pid = fork();
+        if (pid == -1) {
+            perror("fork");
+            return;
+        }
+        if (pid == 0) {
+            if (fexecve(InMemoryFile, argv, envp) == -1) {
+                perror("fexecve");
+                exit(1);
+            }
+        } else {
+            int status;
+            waitpid(pid, &status, 0);
         }
     }
 }
