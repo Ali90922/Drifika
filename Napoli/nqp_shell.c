@@ -224,5 +224,3 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         }
     }
 }
-}
-}
