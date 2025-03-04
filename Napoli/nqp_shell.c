@@ -190,9 +190,10 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         return;
     }
     printf("Memfd header: ");
-    for (int i = 0; i < sizeof(header); i++) {
-        printf("%02x ", header[i]);
-    }
+    for (size_t i = 0; i < sizeof(header); i++) {
+    printf("%02x ", header[i]);
+}
+
     printf("\n");
     fflush(stdout);
 
