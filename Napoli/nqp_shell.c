@@ -176,7 +176,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         FileDescriptor = nqp_open(Argument1);
         printf("File Descriptor is : %d\n", FileDescriptor);
         char *Inter =  "/echo";
-        int Milan = nqp_open(Inter);
+        Milan = nqp_open(Inter);
         printf("File Descriptor for ECHO is  : %d\n", Milan);    
 } else {
         // Append filename to cwd and then open, if necessary.
@@ -225,7 +225,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         printf("Argument2: %s\n", Argument2);
         char *argv[] = {Argument1, Argument2, NULL };
         fchmod(InMemoryFile, 0755);
-        lseek(InMemoryFile, 0, SEEK_SET);
+        lseek(FileDescriptor, 0, SEEK_SET);
         if (fexecve(InMemoryFile, argv, envp) == -1) {
             perror("fexecve");
             exit(1);
