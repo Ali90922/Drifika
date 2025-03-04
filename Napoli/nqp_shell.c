@@ -176,7 +176,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         return;
     }
 
-    // Reset the in-memory file offset for header debugging.
+    // Reset the in-memory file offset before debugging.
     if (lseek(InMemoryFile, 0, SEEK_SET) == -1) {
         perror("lseek before header debug");
         return;
@@ -210,16 +210,14 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         printf("Detected shell script, using temporary file workaround\n");
         fflush(stdout);
 
-        // Create a temporary file.
+        // Create a temporary file that will remain on disk.
         char tmp_template[] = "/tmp/scriptXXXXXX";
         int tmp_fd = mkstemp(tmp_template);
         if (tmp_fd == -1) {
             perror("mkstemp");
             exit(1);
         }
-        // Unlink the temporary file so it will be removed when closed.
-        unlink(tmp_template);
-
+        // Do NOT unlink the temporary file; we need its name for execve.
         // Copy the entire content from the in-memory file to the temporary file.
         if (lseek(InMemoryFile, 0, SEEK_SET) == -1) {
             perror("lseek before copying to tmp");
@@ -240,11 +238,8 @@ void LaunchFunction(char *Argument1, char *Argument2) {
             perror("fchmod tmp file");
             exit(1);
         }
-        // Reset temporary file offset.
-        if (lseek(tmp_fd, 0, SEEK_SET) == -1) {
-            perror("lseek tmp file");
-            exit(1);
-        }
+        // Optionally, close the temporary file descriptor (the file remains on disk).
+        close(tmp_fd);
 
         // Fork and execute using execve on the temporary file.
         pid_t pid = fork();
@@ -253,8 +248,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
             exit(1);
         }
         if (pid == 0) {
-            // In the child process, build the argv vector for the shell script.
-            // Here we assume the temporary file itself is the script to be executed.
+            // Build the argv vector for the shell script.
             char *tmp_argv[] = { tmp_template, Argument2, NULL };
             if (execve(tmp_template, tmp_argv, envp) == -1) {
                 perror("execve");
@@ -263,6 +257,8 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         } else {
             int status;
             waitpid(pid, &status, 0);
+            // Optionally, remove the temporary file after execution.
+            // unlink(tmp_template);
         }
     } else {
         // Otherwise, assume it's a proper ELF binary and execute it using fexecve.
