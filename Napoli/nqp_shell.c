@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "nqp_io.h"
+#include <sys/stat.h>
+
 
 
 
@@ -182,6 +184,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
 
     // Create an in-memory file descriptor
     int InMemoryFile = memfd_create("In-Memory-File", MFD_CLOEXEC);
+    printf("File Descriptor for In Memory File is  : %d\n", InMemoryFile);    
     if (InMemoryFile == -1) {
         perror("memfd_create");
         return;
@@ -219,8 +222,9 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         char *envp[] = { NULL };
         // Construct argv; typically, argv[0] is the program name
         char *argv[] = { Argument2, NULL };
+        fchmod(InMemoryFile, 0755);
         lseek(InMemoryFile, 0, SEEK_SET);
-        if (fexecve(9, argv, envp) == -1) {
+        if (fexecve(4, argv, envp) == -1) {
             perror("fexecve");
             exit(1);
         }
