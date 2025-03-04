@@ -127,15 +127,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
     char abs_path[MAX_LINE_SIZE];
 
     // Build the absolute path for the command.
-    if (strcmp(cwd, "/") == 0) {
-        if (Argument1[0] != '/') {
-            snprintf(abs_path, sizeof(abs_path), "/%s", Argument1);
-        } else {
-            strncpy(abs_path, Argument1, sizeof(abs_path));
-        }
-    } else {
-        snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, Argument1);
-    }
+    snprintf(abs_path, sizeof(abs_path), "/%s", Argument1);
 
     exec_fd = nqp_open(abs_path);
     if (exec_fd == NQP_FILE_NOT_FOUND) {
@@ -152,7 +144,7 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         return;
     }
 
-    // Copy the executable data from the source file into the in-memory file.
+    // Copy executable data from the source file into the in-memory file.
     ssize_t bytes_read, bytes_written;
     char buffer[BUFFER_SIZE];
     size_t total_bytes = 0;
@@ -170,59 +162,30 @@ void LaunchFunction(char *Argument1, char *Argument2) {
     }
     printf("Total bytes read from source: %zu\n", total_bytes);
 
-    // Set execute permissions on the in-memory file.
-    if (fchmod(InMemoryFile, 0755) == -1) {
-        perror("fchmod");
-        return;
-    }
+    // Read first two bytes to detect if it's a shell script
+    char header[2];
+    lseek(InMemoryFile, 0, SEEK_SET);
+    read(InMemoryFile, header, 2);
+    lseek(InMemoryFile, 0, SEEK_SET);
 
-    // Reset the in-memory file offset before debugging.
-    if (lseek(InMemoryFile, 0, SEEK_SET) == -1) {
-        perror("lseek");
-        return;
-    }
+    char *argv[] = { Argument1, Argument2, NULL };
+    char *envp[] = { NULL };
 
-    // Debug: Read and print the first 16 header bytes.
-    unsigned char header[16];
-    ssize_t n = read(InMemoryFile, header, sizeof(header));
-    if (n != sizeof(header)) {
-        perror("read header");
-        return;
-    }
-    printf("Memfd header: ");
-    for (size_t i = 0; i < sizeof(header); i++) {
-    printf("%02x ", header[i]);
-}
-
-    printf("\n");
-    fflush(stdout);
-
-    // Reset the in-memory file offset again before execution.
-    if (lseek(InMemoryFile, 0, SEEK_SET) == -1) {
-        perror("lseek");
-        return;
-    }
-
-    // Fork and execute the command using fexecve.
-    pid_t pid = fork();
-    if (pid == -1) {
-        perror("fork");
-        return;
-    }
-    if (pid == 0) {
-        // In the child process.
-        char *envp[] = { NULL };
-        printf("Argument1: %s\n", Argument1);
-        printf("Argument2: %s\n", Argument2);
-        char *argv[] = { Argument1, Argument2, NULL };
-
+    // If the file starts with "#!", execute it via /bin/sh
+    if (header[0] == '#' && header[1] == '!') {
+        printf("Detected shell script, executing with /bin/sh\n");
+        argv[0] = "/bin/sh";
+        argv[1] = abs_path;
+        argv[2] = NULL;
         if (fexecve(InMemoryFile, argv, envp) == -1) {
             perror("fexecve");
-            exit(1);
+            return;
         }
-        exit(0);
-    } else {
-        int status;
-        waitpid(pid, &status, 0);
+    }
+
+    // Otherwise, assume it's an ELF binary
+    if (fexecve(InMemoryFile, argv, envp) == -1) {
+        perror("fexecve");
+        return;
     }
 }
