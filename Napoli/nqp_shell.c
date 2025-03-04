@@ -173,7 +173,10 @@ void LaunchFunction(char *Argument1, char *Argument2) {
     if (strcmp(cwd, "/") == 0) {
         FileDescriptor = nqp_open(Argument1);
         printf("File Descriptor is : %d\n", FileDescriptor);
-    } else {
+        char *Inter =  "/echo";
+        int Milan = nqp_open(Inter);
+        printf("File Descriptor for ECHO is  : %d\n", Milan);    
+} else {
         // Append filename to cwd and then open, if necessary.
     }
 
