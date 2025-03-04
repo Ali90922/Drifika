@@ -169,20 +169,30 @@ Hi!
 */
 
 void LaunchFunction(char *Argument1, char *Argument2) {
-    int FileDescriptor = 0;
-    int Milan = 0;
-    // Open the file for the command (assuming cwd is "/" for now)
+    int exec_fd = 0;
+    char abs_path[MAX_LINE_SIZE];
+
+    // Build the correct path for the command based on the cwd.
     if (strcmp(cwd, "/") == 0) {
-        FileDescriptor = nqp_open(Argument1);
-        printf("File Descriptor is : %d\n", FileDescriptor);
-        char *Inter =  "/echo";
-        Milan = nqp_open(Inter);
-        printf("File Descriptor for ECHO is  : %d\n", Milan);    
-} else {
-        // Append filename to cwd and then open, if necessary.
+        // If the command does not start with '/', prepend '/'
+        if (Argument1[0] != '/') {
+            snprintf(abs_path, sizeof(abs_path), "/%s", Argument1);
+        } else {
+            strncpy(abs_path, Argument1, sizeof(abs_path));
+        }
+    } else {
+        // If not in root, combine cwd and command name.
+        snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, Argument1);
     }
 
-    // Create an in-memory file descriptor
+    exec_fd = nqp_open(abs_path);
+    if (exec_fd == NQP_FILE_NOT_FOUND) {
+        fprintf(stderr, "Command %s not found\n", abs_path);
+        return;
+    }
+    printf("File Descriptor for command (%s) is : %d\n", abs_path, exec_fd);
+
+    // Create an in-memory file descriptor.
     int InMemoryFile = memfd_create("In-Memory-File", MFD_CLOEXEC);
     printf("File Descriptor for In Memory File is  : %d\n", InMemoryFile);    
     if (InMemoryFile == -1) {
@@ -190,47 +200,53 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         return;
     }
 
-    // Read bytes from the source file and write them into the in-memory file
+    // Read the executable data from the file and write it into the in-memory file.
     ssize_t bytes_read, bytes_written;
     char buffer[BUFFER_SIZE];
-    while ((bytes_read = nqp_read(Milan, buffer, BUFFER_SIZE)) > 0) {
+    while ((bytes_read = nqp_read(exec_fd, buffer, BUFFER_SIZE)) > 0) {
         bytes_written = write(InMemoryFile, buffer, bytes_read);
         if (bytes_written != bytes_read) {
             fprintf(stderr, "Error writing to in-memory file\n");
-            // Handle error appropriately
+            return;
         }
     }
     if (bytes_read < 0) {
         fprintf(stderr, "Error reading the source file\n");
-        // Handle error appropriately
+        return;
     }
 
-    // IMPORTANT: Reset the file offset to the beginning before fexecve
+    // Set execute permissions on the in-memory file.
+    if (fchmod(InMemoryFile, 0755) == -1) {
+        perror("fchmod");
+        return;
+    }
+
+    // Reset the file offset of the in-memory file before execution.
     if (lseek(InMemoryFile, 0, SEEK_SET) == -1) {
         perror("lseek");
         return;
     }
 
-    // Fork and execute the command using fexecve in the child process
+    // Fork and execute the command using fexecve in the child process.
     pid_t pid = fork();
     if (pid == -1) {
         perror("fork");
         return;
     }
     if (pid == 0) {
-        // Child Process
+        // Child process: set up argv and execute.
         char *envp[] = { NULL };
-        // Construct argv; typically, argv[0] is the program name
         printf("Argument1: %s\n", Argument1);
         printf("Argument2: %s\n", Argument2);
-        char *argv[] = {Argument1, Argument2, NULL };
-        fchmod(InMemoryFile, 0755);
-        lseek(FileDescriptor, 0, SEEK_SET);
+        char *argv[] = { Argument1, Argument2, NULL };
+
         if (fexecve(InMemoryFile, argv, envp) == -1) {
             perror("fexecve");
             exit(1);
         }
+    } else {
+        // Parent process: optionally wait for the child to finish.
+        int status;
+        waitpid(pid, &status, 0);
     }
-
-    // Optionally, parent process can wait for the child to finish.
 }
