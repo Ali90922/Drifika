@@ -1,3 +1,6 @@
+#define _POSIX_C_SOURCE 200809L
+#define _GNU_SOURCE
+
 #include <fcntl.h>  // For mkstemp
 #include <sys/types.h>
 #include <sys/wait.h>
