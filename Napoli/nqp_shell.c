@@ -253,6 +253,18 @@ void LaunchFunction(char *Argument1, char *Argument2) {
         perror("lseek");
         exit(1);
     }
+        unsigned char header[16];
+ssize_t n = read(InMemoryFile, header, sizeof(header));
+if (n != sizeof(header)) {
+    perror("read header");
+    return;
+}
+printf("Memfd header: ");
+for (int i = 0; i < sizeof(header); i++) {
+    printf("%02x ", header[i]);
+}
+printf("\n");
+
         if (fexecve(InMemoryFile, argv, envp) == -1) {
             perror("fexecve");
             exit(1);
