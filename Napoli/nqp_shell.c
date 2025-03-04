@@ -182,10 +182,10 @@ void LaunchFunction(char *Argument1, char *Argument2) {
             return;
         }
     }
-
-    // Otherwise, assume it's an ELF binary
-    else (fexecve(InMemoryFile, argv, envp) == -1) {
-        perror("fexecve");
-        return;
+    else {
+        if (fexecve(InMemoryFile, argv, envp) == -1) {
+            perror("fexecve");
+            return;
+        }
     }
 }
