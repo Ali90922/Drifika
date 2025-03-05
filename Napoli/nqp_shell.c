@@ -632,21 +632,27 @@ void LaunchPipelineCommand(char **cmd_argv)
     int is_shell_script = (debug_header[0] == '#' && debug_header[1] == '!');
     if (!is_shell_script)
     {
-        // For binaries, fix file arguments.
         fix_file_args(cmd_argv);
+    }
+    else
+    {
+        /* For shell scripts in a pipeline (e.g. head), we want to remove any non-option arguments
+           so that the command reads solely from STDIN. */
+        if ((strcmp(cmd_argv[0], "head") == 0 || strcmp(cmd_argv[0], "/head") == 0))
+        {
+            // Retain options (arguments starting with '-') only.
+            int j = 1;
+            for (int i = 1; cmd_argv[i] != NULL; i++)
+            {
+                if (cmd_argv[i][0] == '-')
+                    cmd_argv[j++] = cmd_argv[i];
+            }
+            cmd_argv[j] = NULL;
+        }
     }
 
     if (is_shell_script)
     {
-        // For shell scripts in a pipeline, remove non-option arguments so the script reads from STDIN.
-        int j = 1;
-        for (int i = 1; cmd_argv[i] != NULL; i++)
-        {
-            if (cmd_argv[i][0] == '-')
-                cmd_argv[j++] = cmd_argv[i];
-        }
-        cmd_argv[j] = NULL;
-
         char tmp_template[] = "/tmp/scriptXXXXXX";
         int tmp_fd = mkstemp(tmp_template);
         if (tmp_fd == -1)
@@ -678,6 +684,8 @@ void LaunchPipelineCommand(char **cmd_argv)
             exit(1);
         }
         close(tmp_fd);
+        /* Preserve the original command name in cmd_argv[0] */
+        // Do not modify cmd_argv[0]; it should remain "head" (or the original command)
         {
             char *envp[] = {NULL};
             if (execve(tmp_template, cmd_argv, envp) == -1)
