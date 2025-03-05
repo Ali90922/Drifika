@@ -256,10 +256,8 @@ void LaunchFunction(char **cmd_argv, char *input_file)
 
     ssize_t bytes_read, bytes_written;
     char buffer[BUFFER_SIZE];
-    size_t total_bytes = 0;
     while ((bytes_read = nqp_read(exec_fd, buffer, BUFFER_SIZE)) > 0)
     {
-        total_bytes += bytes_read;
         bytes_written = write(InMemoryFile, buffer, bytes_read);
         if (bytes_written != bytes_read)
         {
@@ -272,7 +270,6 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         fprintf(stderr, "Error reading the source file\n");
         return;
     }
-    printf("Total bytes read from source: %zu\n", total_bytes);
 
     if (fchmod(InMemoryFile, 0755) == -1)
     {
@@ -585,10 +582,8 @@ void LaunchPipelineCommand(char **cmd_argv)
 
     ssize_t bytes_read, bytes_written;
     char buffer[BUFFER_SIZE];
-    // size_t total_bytes = 0;
     while ((bytes_read = nqp_read(exec_fd, buffer, BUFFER_SIZE)) > 0)
     {
-        total_bytes += bytes_read;
         bytes_written = write(InMemoryFile, buffer, bytes_read);
         if (bytes_written != bytes_read)
         {
