@@ -248,7 +248,6 @@ void handle_cd(char *dir)
 }
 
 /* Built-in: List directory contents */
-// Copied the code from last assignment and modified it slightly
 void handle_ls()
 {
     nqp_dirent entry = {0};
@@ -258,47 +257,22 @@ void handle_ls()
     if (fd == NQP_FILE_NOT_FOUND)
     {
         fprintf(stderr, "%s not found\n", cwd);
-        return;
     }
-
-    while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
+    else
     {
-        // Skip AppleDouble metadata files (e.g., "._Juve.txt")
-        if (strncmp(entry.name, "._", 2) == 0)
+        while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
         {
-            free(entry.name);
-            continue;
-        }
-
-        // Check for any embedded '/' (i.e. not just a trailing slash)
-        char *slash = strchr(entry.name, '/');
-        if (slash != NULL)
-        {
-            size_t len = strlen(entry.name);
-            // If the slash is not at the very end of the string, then it’s a nested entry.
-            if (slash < entry.name + len - 1)
-            {
-                free(entry.name);
-                continue;
-            }
-        }
-
-        // Print the inode number and name.
-        printf("%lu %s", entry.inode_number, entry.name);
-        // If the entry is a directory and the name doesn’t already end with a slash, add one.
-        if (entry.type == DT_DIR)
-        {
-            size_t len = strlen(entry.name);
-            if (len == 0 || entry.name[len - 1] != '/')
+            // (Optional filtering can be added here if needed)
+            printf("%lu %s", entry.inode_number, entry.name);
+            if (entry.type == DT_DIR)
                 putchar('/');
+            putchar('\n');
+            free(entry.name);
         }
-        putchar('\n');
-        free(entry.name);
+        if (dirents_read == -1)
+            fprintf(stderr, "%s is not a directory\n", cwd);
+        nqp_close(fd);
     }
-
-    if (dirents_read == -1)
-        fprintf(stderr, "%s is not a directory\n", cwd);
-    nqp_close(fd);
 }
 
 /* LaunchFunction: For a single command (without pipes) */
@@ -451,7 +425,7 @@ void LaunchFunction(char **cmd_argv, char *input_file)
                 perror("chdir");
                 exit(1);
             }
-            // Fix file arguments before exec (for example, replace "Juve.txt" with temporary file)
+            // Fix file arguments before exec.
             fix_file_args(cmd_argv);
             cmd_argv[0] = tmp_template;
             {
@@ -712,6 +686,9 @@ void LaunchPipelineCommand(char **cmd_argv)
         exit(1);
     }
 
+    // Always fix file arguments before executing.
+    fix_file_args(cmd_argv);
+
     if (debug_header[0] == '#' && debug_header[1] == '!')
     {
         char tmp_template[] = "/tmp/scriptXXXXXX";
@@ -764,8 +741,6 @@ void LaunchPipelineCommand(char **cmd_argv)
         }
         {
             char *envp[] = {NULL};
-            // Fix file arguments before executing.
-            fix_file_args(cmd_argv);
             if (fexecve(InMemoryFile, cmd_argv, envp) == -1)
             {
                 perror("fexecve");
