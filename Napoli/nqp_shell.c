@@ -686,11 +686,16 @@ void LaunchPipelineCommand(char **cmd_argv)
         exit(1);
     }
 
-    // Always fix file arguments before executing.
-    fix_file_args(cmd_argv);
-
-    if (debug_header[0] == '#' && debug_header[1] == '!')
+    // For binary executables, fix file arguments.
+    int is_shell_script = (debug_header[0] == '#' && debug_header[1] == '!');
+    if (!is_shell_script)
     {
+        fix_file_args(cmd_argv);
+    }
+
+    if (is_shell_script)
+    {
+        // Shell script branch: do not fix file args.
         char tmp_template[] = "/tmp/scriptXXXXXX";
         int tmp_fd = mkstemp(tmp_template);
         if (tmp_fd == -1)
@@ -734,11 +739,7 @@ void LaunchPipelineCommand(char **cmd_argv)
     }
     else
     {
-        if (lseek(InMemoryFile, 0, SEEK_SET) == -1)
-        {
-            perror("lseek after header debug");
-            exit(1);
-        }
+        // Binary branch.
         {
             char *envp[] = {NULL};
             if (fexecve(InMemoryFile, cmd_argv, envp) == -1)
