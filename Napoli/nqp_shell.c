@@ -367,10 +367,13 @@ void LaunchFunction(char **cmd_argv, char *input_file)
                 exit(1);
             }
             cmd_argv[0] = tmp_template;
-            if (execve(tmp_template, cmd_argv, NULL) == -1)
             {
-                perror("execve");
-                exit(1);
+                char *envp[] = {NULL};
+                if (execve(tmp_template, cmd_argv, envp) == -1)
+                {
+                    perror("execve");
+                    exit(1);
+                }
             }
         }
         else
@@ -401,10 +404,13 @@ void LaunchFunction(char **cmd_argv, char *input_file)
                 }
                 close(input_fd);
             }
-            if (fexecve(InMemoryFile, cmd_argv, NULL) == -1)
             {
-                perror("fexecve");
-                exit(1);
+                char *envp[] = {NULL};
+                if (fexecve(InMemoryFile, cmd_argv, envp) == -1)
+                {
+                    perror("fexecve");
+                    exit(1);
+                }
             }
         }
         else
@@ -651,10 +657,13 @@ void LaunchPipelineCommand(char **cmd_argv)
         }
         close(tmp_fd);
         cmd_argv[0] = tmp_template;
-        if (execve(tmp_template, cmd_argv, NULL) == -1)
         {
-            perror("execve");
-            exit(1);
+            char *envp[] = {NULL};
+            if (execve(tmp_template, cmd_argv, envp) == -1)
+            {
+                perror("execve");
+                exit(1);
+            }
         }
     }
     else
@@ -664,10 +673,13 @@ void LaunchPipelineCommand(char **cmd_argv)
             perror("lseek after header debug");
             exit(1);
         }
-        if (fexecve(InMemoryFile, cmd_argv, NULL) == -1)
         {
-            perror("fexecve");
-            exit(1);
+            char *envp[] = {NULL};
+            if (fexecve(InMemoryFile, cmd_argv, envp) == -1)
+            {
+                perror("fexecve");
+                exit(1);
+            }
         }
     }
 }
