@@ -25,69 +25,6 @@ void handle_pwd();
 void handle_ls();
 void LaunchFunction(char **cmd_argv, char *input_file);
 
-/* Helper: Set up input redirection by reading a file from the volume into a memory file.
-   Returns a file descriptor (which should be dup2'ed to STDIN_FILENO) or -1 on error. */
-int setup_input_redirection(const char *filename)
-{
-    char input_abs[MAX_LINE_SIZE];
-    // If filename is not absolute, combine with current working directory.
-    if (filename[0] != '/')
-    {
-        if (strcmp(cwd, "/") == 0)
-        {
-            snprintf(input_abs, sizeof(input_abs), "/%s", filename);
-        }
-        else
-        {
-            snprintf(input_abs, sizeof(input_abs), "%s/%s", cwd, filename);
-        }
-    }
-    else
-    {
-        strncpy(input_abs, filename, sizeof(input_abs));
-    }
-
-    int fd = nqp_open(input_abs);
-    if (fd == NQP_FILE_NOT_FOUND)
-    {
-        fprintf(stderr, "Input file %s not found\n", input_abs);
-        return -1;
-    }
-    int memfd_in = memfd_create("In-Memory-Input", MFD_CLOEXEC);
-    if (memfd_in == -1)
-    {
-        perror("memfd_create for input");
-        return -1;
-    }
-    ssize_t r, w;
-    char buf[BUFFER_SIZE];
-    while ((r = nqp_read(fd, buf, BUFFER_SIZE)) > 0)
-    {
-        w = write(memfd_in, buf, r);
-        if (w != r)
-        {
-            fprintf(stderr, "Error writing input file to memory file\n");
-            close(memfd_in);
-            return -1;
-        }
-    }
-    if (r < 0)
-    {
-        fprintf(stderr, "Error reading input file %s\n", input_abs);
-        close(memfd_in);
-        return -1;
-    }
-    nqp_close(fd);
-    // Reset offset so that the file is read from the beginning.
-    if (lseek(memfd_in, 0, SEEK_SET) == -1)
-    {
-        perror("lseek on input memfd");
-        close(memfd_in);
-        return -1;
-    }
-    return memfd_in;
-}
-
 int main(int argc, char *argv[], char *envp[])
 {
     char line_buffer[MAX_LINE_SIZE] = {0};
@@ -515,4 +452,67 @@ void LaunchFunction(char **cmd_argv, char *input_file)
             waitpid(pid, &status, 0);
         }
     }
+}
+
+/* Helper: Set up input redirection by reading a file from the volume into a memory file.
+   Returns a file descriptor (which should be dup2'ed to STDIN_FILENO) or -1 on error. */
+int setup_input_redirection(const char *filename)
+{
+    char input_abs[MAX_LINE_SIZE];
+    // If filename is not absolute, combine with current working directory.
+    if (filename[0] != '/')
+    {
+        if (strcmp(cwd, "/") == 0)
+        {
+            snprintf(input_abs, sizeof(input_abs), "/%s", filename);
+        }
+        else
+        {
+            snprintf(input_abs, sizeof(input_abs), "%s/%s", cwd, filename);
+        }
+    }
+    else
+    {
+        strncpy(input_abs, filename, sizeof(input_abs));
+    }
+
+    int fd = nqp_open(input_abs);
+    if (fd == NQP_FILE_NOT_FOUND)
+    {
+        fprintf(stderr, "Input file %s not found\n", input_abs);
+        return -1;
+    }
+    int memfd_in = memfd_create("In-Memory-Input", MFD_CLOEXEC);
+    if (memfd_in == -1)
+    {
+        perror("memfd_create for input");
+        return -1;
+    }
+    ssize_t r, w;
+    char buf[BUFFER_SIZE];
+    while ((r = nqp_read(fd, buf, BUFFER_SIZE)) > 0)
+    {
+        w = write(memfd_in, buf, r);
+        if (w != r)
+        {
+            fprintf(stderr, "Error writing input file to memory file\n");
+            close(memfd_in);
+            return -1;
+        }
+    }
+    if (r < 0)
+    {
+        fprintf(stderr, "Error reading input file %s\n", input_abs);
+        close(memfd_in);
+        return -1;
+    }
+    nqp_close(fd);
+    // Reset offset so that the file is read from the beginning.
+    if (lseek(memfd_in, 0, SEEK_SET) == -1)
+    {
+        perror("lseek on input memfd");
+        close(memfd_in);
+        return -1;
+    }
+    return memfd_in;
 }
