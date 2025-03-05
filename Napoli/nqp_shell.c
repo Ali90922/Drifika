@@ -41,12 +41,11 @@ void fix_file_args(char **cmd_argv)
 {
     for (int i = 1; cmd_argv[i] != NULL; i++)
     {
-        // Build an absolute path based on cwd if needed.
         char abs_path[MAX_LINE_SIZE];
         if (cmd_argv[i][0] != '/')
         {
             if (strcmp(cwd, "/") == 0)
-                snprintf(abs_path, sizeof(abs_path), "/%s", cmd_argv[i]);
+                snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[i]);
             else
                 snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[i]);
         }
@@ -54,11 +53,9 @@ void fix_file_args(char **cmd_argv)
         {
             strncpy(abs_path, cmd_argv[i], sizeof(abs_path));
         }
-
         int fd = nqp_open(abs_path);
         if (fd != NQP_FILE_NOT_FOUND)
         {
-            // We found the file on the volume—create a temporary file.
             char tmp_template[] = "/tmp/volfileXXXXXX";
             int tmp_fd = mkstemp(tmp_template);
             if (tmp_fd == -1)
@@ -80,7 +77,6 @@ void fix_file_args(char **cmd_argv)
             }
             close(tmp_fd);
             nqp_close(fd);
-            // Replace the argument with a duplicate of the temporary filename.
             cmd_argv[i] = strdup(tmp_template);
         }
     }
@@ -105,9 +101,7 @@ int main(int argc, char *argv[], char *envp[])
     if (mount_error != NQP_OK)
     {
         if (mount_error == NQP_FSCK_FAIL)
-        {
             fprintf(stderr, "%s is inconsistent, not mounting.\n", argv[1]);
-        }
         exit(EXIT_FAILURE);
     }
 
@@ -124,7 +118,7 @@ int main(int argc, char *argv[], char *envp[])
         if (strlen(line_buffer) == 0)
             continue;
 
-        // If the line contains a pipe, process it as a pipeline.
+        // Check for pipe character.
         if (strchr(line_buffer, '|') != NULL)
         {
             LaunchPipeline(line_buffer);
@@ -143,7 +137,7 @@ int main(int argc, char *argv[], char *envp[])
         if (token_count == 0)
             continue;
 
-        /* Handle built-in commands first */
+        /* Handle built-in commands */
         if (strcmp(tokens[0], "exit") == 0)
         {
             printf("Exiting shell...\n");
@@ -165,9 +159,7 @@ int main(int argc, char *argv[], char *envp[])
             continue;
         }
 
-        /* Process input redirection for a single command:
-           Look for a "<" token. If found, the next token is the file to use for input.
-           Remove these tokens from the command's argument vector. */
+        /* Process input redirection for a single command */
         char *cmd_argv[MAX_ARGS];
         int cmd_argc = 0;
         char *input_file = NULL;
@@ -178,7 +170,7 @@ int main(int argc, char *argv[], char *envp[])
                 if (i + 1 < token_count)
                 {
                     input_file = tokens[i + 1];
-                    i++; // Skip the filename token.
+                    i++; // Skip filename token.
                 }
                 else
                 {
@@ -202,14 +194,13 @@ int main(int argc, char *argv[], char *envp[])
     return EXIT_SUCCESS;
 }
 
-/* Built-in: Print the current working directory */
+/* handle_pwd: Print the current working directory */
 void handle_pwd()
 {
     printf("%s\n", cwd);
 }
 
-/* Built-in: Change directory.
-   Supports "cd .." to go back a directory. */
+/* handle_cd: Change directory. Supports "cd .." to go back a directory. */
 void handle_cd(char *dir)
 {
     if (dir == NULL)
@@ -220,7 +211,7 @@ void handle_cd(char *dir)
     if (strcmp(dir, "..") == 0)
     {
         if (strcmp(cwd, "/") == 0)
-            return; // Already at root.
+            return;
         char *last_slash = strrchr(cwd, '/');
         if (last_slash == cwd)
             strcpy(cwd, "/");
@@ -228,7 +219,6 @@ void handle_cd(char *dir)
             *last_slash = '\0';
         return;
     }
-    // Build absolute path.
     char path_copy[256];
     if (dir[0] != '/')
     {
@@ -247,7 +237,8 @@ void handle_cd(char *dir)
         fprintf(stderr, "Directory %s not found\n", path_copy);
 }
 
-/* Built-in: List directory contents */
+/* handle_ls: List directory contents.
+   (No additional filtering is applied here.) */
 void handle_ls()
 {
     nqp_dirent entry = {0};
@@ -262,7 +253,6 @@ void handle_ls()
     {
         while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
         {
-            // (Optional filtering can be added here if needed)
             printf("%lu %s", entry.inode_number, entry.name);
             if (entry.type == DT_DIR)
                 putchar('/');
@@ -281,13 +271,10 @@ void LaunchFunction(char **cmd_argv, char *input_file)
     int exec_fd = 0;
     char abs_path[MAX_LINE_SIZE];
 
-    // Build absolute path for the command.
+    // Build absolute path: if cwd is "/" then use the command as is.
     if (strcmp(cwd, "/") == 0)
     {
-        if (cmd_argv[0][0] != '/')
-            snprintf(abs_path, sizeof(abs_path), "/%s", cmd_argv[0]);
-        else
-            strncpy(abs_path, cmd_argv[0], sizeof(abs_path));
+        snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[0]);
     }
     else
     {
@@ -302,7 +289,6 @@ void LaunchFunction(char **cmd_argv, char *input_file)
     }
     printf("File Descriptor for command (%s) is : %d\n", abs_path, exec_fd);
 
-    // Create an in-memory file for the executable.
     int InMemoryFile = memfd_create("In-Memory-File", MFD_CLOEXEC);
     printf("File Descriptor for In Memory File is  : %d\n", InMemoryFile);
     if (InMemoryFile == -1)
@@ -333,7 +319,6 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         perror("fchmod");
         return;
     }
-
     if (lseek(InMemoryFile, 0, SEEK_SET) == -1)
     {
         perror("lseek before header debug");
@@ -360,9 +345,9 @@ void LaunchFunction(char **cmd_argv, char *input_file)
     }
 
     /* Fork and execute the command.
-       Also sets up input redirection (if any) before exec.
-       Before exec, fix file arguments so that file names (like Juve.txt) are replaced
-       with temporary file paths containing the file's contents from the mounted volume. */
+       Set up input redirection if needed.
+       Before exec, fix file arguments so that file names (like Juve.txt) are replaced with temporary files,
+       so that the command can open them on the host system. */
     if (debug_header[0] == '#' && debug_header[1] == '!')
     {
         printf("Detected shell script, using temporary file workaround\n");
@@ -425,7 +410,6 @@ void LaunchFunction(char **cmd_argv, char *input_file)
                 perror("chdir");
                 exit(1);
             }
-            // Fix file arguments before exec.
             fix_file_args(cmd_argv);
             cmd_argv[0] = tmp_template;
             {
@@ -465,7 +449,6 @@ void LaunchFunction(char **cmd_argv, char *input_file)
                 }
                 close(input_fd);
             }
-            // Fix file arguments before exec.
             fix_file_args(cmd_argv);
             {
                 char *envp[] = {NULL};
@@ -484,15 +467,14 @@ void LaunchFunction(char **cmd_argv, char *input_file)
     }
 }
 
-/* LaunchPipeline:
-   Processes a line containing one or more piped commands.
+/* LaunchPipeline: Processes a line containing one or more piped commands.
    Only the first command can use input redirection via "<". */
 void LaunchPipeline(char *line)
 {
     char *segments[MAX_PIPE_CMDS];
     int num_cmds = 0;
 
-    // Split the line by the '|' symbol.
+    // Split the input line on the pipe '|' character.
     char *segment = strtok(line, "|");
     while (segment != NULL && num_cmds < MAX_PIPE_CMDS)
     {
@@ -500,8 +482,7 @@ void LaunchPipeline(char *line)
         segment = strtok(NULL, "|");
     }
 
-    // For each segment, tokenize into arguments.
-    // For the first command, also check for input redirection.
+    // For each segment, tokenize it into arguments.
     struct Command
     {
         char *args[MAX_ARGS];
@@ -512,11 +493,10 @@ void LaunchPipeline(char *line)
     {
         int arg_count = 0;
         commands[i].input_file = NULL;
-        // Tokenize using whitespace.
         char *tok = strtok(segments[i], " ");
         while (tok != NULL && arg_count < MAX_ARGS - 1)
         {
-            // Only first command can have input redirection.
+            // Only the first command may have input redirection.
             if (i == 0 && strcmp(tok, "<") == 0)
             {
                 tok = strtok(NULL, " ");
@@ -557,7 +537,6 @@ void LaunchPipeline(char *line)
         if (pid == 0)
         {
             // Child process:
-            // If there is a previous pipe, set its read end as STDIN.
             if (prev_pipe_fd != -1)
             {
                 if (dup2(prev_pipe_fd, STDIN_FILENO) == -1)
@@ -567,7 +546,6 @@ void LaunchPipeline(char *line)
                 }
                 close(prev_pipe_fd);
             }
-            // If not the last command, set the current pipe's write end as STDOUT.
             if (i < num_cmds - 1)
             {
                 if (dup2(pipe_fd[1], STDOUT_FILENO) == -1)
@@ -578,7 +556,6 @@ void LaunchPipeline(char *line)
                 close(pipe_fd[0]);
                 close(pipe_fd[1]);
             }
-            // For the first command, if input redirection is specified.
             if (i == 0 && commands[i].input_file != NULL)
             {
                 int input_fd = setup_input_redirection(commands[i].input_file);
@@ -591,13 +568,11 @@ void LaunchPipeline(char *line)
                 }
                 close(input_fd);
             }
-            // Fix file arguments and execute the command.
             LaunchPipelineCommand(commands[i].args);
-            exit(1); // Should not reach here.
+            exit(1);
         }
         else
         {
-            // Parent process: close old pipe fd and prepare for next iteration.
             if (prev_pipe_fd != -1)
                 close(prev_pipe_fd);
             if (i < num_cmds - 1)
@@ -607,7 +582,6 @@ void LaunchPipeline(char *line)
             }
         }
     }
-    // Wait for all children.
     for (int i = 0; i < num_cmds; i++)
     {
         int status;
@@ -615,9 +589,8 @@ void LaunchPipeline(char *line)
     }
 }
 
-/* LaunchPipelineCommand:
-   Similar to LaunchFunction but intended to be called in a child process already set up
-   for piping. (It loads the executable from the volume into memory and then execs it.) */
+/* LaunchPipelineCommand: Similar to LaunchFunction but for commands in a pipeline.
+   It loads the executable from the volume into a memory-backed file and then execs it. */
 void LaunchPipelineCommand(char **cmd_argv)
 {
     int exec_fd = 0;
@@ -625,10 +598,7 @@ void LaunchPipelineCommand(char **cmd_argv)
 
     if (strcmp(cwd, "/") == 0)
     {
-        if (cmd_argv[0][0] != '/')
-            snprintf(abs_path, sizeof(abs_path), "/%s", cmd_argv[0]);
-        else
-            strncpy(abs_path, cmd_argv[0], sizeof(abs_path));
+        snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[0]);
     }
     else
     {
@@ -671,7 +641,6 @@ void LaunchPipelineCommand(char **cmd_argv)
         perror("fchmod");
         exit(1);
     }
-
     if (lseek(InMemoryFile, 0, SEEK_SET) == -1)
     {
         perror("lseek before header debug");
@@ -686,7 +655,6 @@ void LaunchPipelineCommand(char **cmd_argv)
         exit(1);
     }
 
-    // For binary executables, fix file arguments.
     int is_shell_script = (debug_header[0] == '#' && debug_header[1] == '!');
     if (!is_shell_script)
     {
@@ -695,7 +663,6 @@ void LaunchPipelineCommand(char **cmd_argv)
 
     if (is_shell_script)
     {
-        // Shell script branch: do not fix file args.
         char tmp_template[] = "/tmp/scriptXXXXXX";
         int tmp_fd = mkstemp(tmp_template);
         if (tmp_fd == -1)
@@ -739,7 +706,6 @@ void LaunchPipelineCommand(char **cmd_argv)
     }
     else
     {
-        // Binary branch.
         {
             char *envp[] = {NULL};
             if (fexecve(InMemoryFile, cmd_argv, envp) == -1)
@@ -751,8 +717,9 @@ void LaunchPipelineCommand(char **cmd_argv)
     }
 }
 
-/* Helper: Set up input redirection by reading a file from the volume into a memory file.
-   Returns a file descriptor (which should be dup2'ed to STDIN_FILENO) or -1 on error. */
+/* setup_input_redirection: Reads a file from the volume into a memory-backed file,
+   returns a file descriptor for that memory file, which can be dup2'ed to STDIN.
+*/
 int setup_input_redirection(const char *filename)
 {
     char input_abs[MAX_LINE_SIZE];
