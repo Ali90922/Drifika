@@ -535,8 +535,10 @@ void LaunchSinglePipe(char *line)
         if (input_file != NULL) // Only oges into this sub- condition if th einput redirection is on -- For now Let's test it with this being off
         {
             int in_fd = setup_input_redirection(input_file);
+            printf("Input ReDirection Process is taking place \n");
             if (in_fd == -1)
                 exit(1);
+            printf("Input ReDirection Process is taking place \n");
             dup2(in_fd, STDIN_FILENO);
             close(in_fd);
             printf("Input ReDirection Process is taking place \n");
