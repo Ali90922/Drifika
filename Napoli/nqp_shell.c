@@ -432,6 +432,7 @@ void LaunchSinglePipe(char *line)
         fprintf(stderr, "Syntax error: expected two commands separated by a pipe\n");
         return;
     }
+
     /* Tokenize left command */
     char *left_tokens[MAX_ARGS];
     int left_argc = 0;
@@ -458,6 +459,17 @@ void LaunchSinglePipe(char *line)
     }
     left_tokens[left_argc] = NULL;
 
+    /* Print left tokens */
+    printf("Left tokens:\n");
+    for (int i = 0; left_tokens[i] != NULL; i++)
+    {
+        printf("  left_tokens[%d]: '%s'\n", i, left_tokens[i]);
+    }
+    if (input_file != NULL)
+    {
+        printf("Input file: '%s'\n", input_file);
+    }
+
     /* Tokenize right command */
     char *right_tokens[MAX_ARGS];
     int right_argc = 0;
@@ -469,6 +481,13 @@ void LaunchSinglePipe(char *line)
         token = strtok_r(NULL, " ", &saveptr_right);
     }
     right_tokens[right_argc] = NULL;
+
+    /* Print right tokens */
+    printf("Right tokens:\n");
+    for (int i = 0; right_tokens[i] != NULL; i++)
+    {
+        printf("  right_tokens[%d]: '%s'\n", i, right_tokens[i]);
+    }
 
     int pipe_fd[2];
     if (pipe(pipe_fd) == -1)
