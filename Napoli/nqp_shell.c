@@ -37,7 +37,7 @@ void fix_file_args(char **cmd_argv);
  * For each argument (except cmd_argv[0]), check if the file exists on the volume.
  * If it does, create a temporary file on the host with its contents and replace the argument.
  *
- * Note: When cwd == "/" we now use the filename as provided (without a prepended slash).
+ * Note: When cwd == "/" we use the filename as provided (without a prepended slash).
  */
 void fix_file_args(char **cmd_argv)
 {
@@ -47,7 +47,7 @@ void fix_file_args(char **cmd_argv)
         if (cmd_argv[i][0] != '/')
         {
             if (strcmp(cwd, "/") == 0)
-                snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[i]); // no extra slash
+                snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[i]);
             else
                 snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[i]);
         }
@@ -269,8 +269,8 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         return;
     }
     unsigned char debug_header[16];
-    ssize_t n = read(InMemoryFile, debug_header, sizeof(debug_header));
-    if (n != sizeof(debug_header))
+    bytes_read = read(InMemoryFile, debug_header, sizeof(debug_header));
+    if (bytes_read != sizeof(debug_header))
     {
         perror("read header");
         return;
@@ -285,10 +285,10 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         perror("lseek after header debug");
         return;
     }
-    /* In pipeline mode for head, skip fix_file_args */
-    if (!(pipeline_mode && strcmp(cmd_argv[0], "head") == 0))
+    /* In pipeline mode, if the command is head or tail, skip fixing file arguments */
+    if (!(pipeline_mode && (strcmp(cmd_argv[0], "head") == 0 || strcmp(cmd_argv[0], "tail") == 0)))
         fix_file_args(cmd_argv);
-    /* Execute command: determine if shell script or binary */
+    /* Execute command: if shell script, use temporary file workaround */
     if (debug_header[0] == '#' && debug_header[1] == '!')
     {
         printf("Detected shell script, using temporary file workaround\n");
@@ -507,8 +507,8 @@ void LaunchSinglePipe(char *line)
         dup2(pipe_fd[0], STDIN_FILENO);
         close(pipe_fd[0]);
         close(pipe_fd[1]);
-        /* For head, remove extra file arguments so it reads only from STDIN */
-        if (strcmp(right_tokens[0], "head") == 0)
+        /* Special-case: for head and tail, remove extra file arguments so they read only from STDIN */
+        if (strcmp(right_tokens[0], "head") == 0 || strcmp(right_tokens[0], "tail") == 0)
         {
             int j = 1;
             for (int i = 1; right_tokens[i] != NULL; i++)
