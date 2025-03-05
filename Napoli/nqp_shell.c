@@ -34,9 +34,9 @@ void fix_file_args(char **cmd_argv);
 
 /*
  * fix_file_args:
- * For each argument (except cmd_argv[0]), check if the file exists on the volume.
- * If it does, create a temporary file on the host with its contents and replace the argument.
- * (When cwd == "/" we simply use the given filename.)
+ * For each argument (except cmd_argv[0] which is the command name), check if the file exists on the volume.
+ * If it does, create a temporary file on the host with its contents and then replace the argument with the temporary file's path.
+ * When cwd == "/" we use the given filename as-is.
  */
 void fix_file_args(char **cmd_argv)
 {
@@ -87,7 +87,7 @@ void fix_file_args(char **cmd_argv)
  * setup_input_redirection:
  * Reads a file (given by filename) from the volume into a memory-backed file.
  * Returns a file descriptor for that memory file.
- * (When cwd == "/" we use the filename as provided.)
+ * When cwd == "/" we use the filename as provided.
  */
 int setup_input_redirection(const char *filename)
 {
@@ -213,19 +213,27 @@ void handle_ls(void)
     }
 }
 
-/* LaunchFunction: Execute a single command (without a pipe) */
+/* LaunchFunction: Execute a single command (without a pipe)
+ *
+ * Steps:
+ * 1. Build the absolute path for the command.
+ * 2. (Optionally) Strip a leading "._" from the command name.
+ * 3. Open the file from the volume and load its contents into an in‑memory file.
+ * 4. Read the header of the in‑memory file to check if it is a shell script (i.e. starts with "#!").
+ * 5. If not in pipeline mode for head/tail, call fix_file_args to process file arguments.
+ * 6. Fork and execute the command. For shell scripts, use a temporary file workaround.
+ */
 void LaunchFunction(char **cmd_argv, char *input_file)
 {
     int exec_fd = 0;
     char abs_path[MAX_LINE_SIZE];
 
-    /* Construct the absolute path */
     if (strcmp(cwd, "/") == 0)
         snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[0]);
     else
         snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[0]);
 
-    /* Special-case: if the command name starts with "._", strip it */
+    /* Special-case: if the command name starts with "._", skip the "._" */
     if (strncmp(cmd_argv[0], "._", 2) == 0)
         cmd_argv[0] += 2;
 
@@ -288,10 +296,15 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         perror("lseek after header debug");
         return;
     }
-    /* If we're in pipeline mode and the command is head or tail, skip fixing file arguments */
+    /* In pipeline mode, if the command is head or tail, skip fixing file arguments */
     if (!(pipeline_mode && (strcmp(cmd_argv[0], "head") == 0 || strcmp(cmd_argv[0], "tail") == 0)))
         fix_file_args(cmd_argv);
-    /* Execute command: if it's a shell script, use a temporary file workaround */
+
+    /* Execute command:
+       - If the in-memory file starts with "#!" it’s considered a shell script.
+         In that case, we use a temporary file workaround.
+       - Otherwise, we assume it’s a binary and use fexecve.
+    */
     if (debug_header[0] == '#' && debug_header[1] == '!')
     {
         printf("Detected shell script, using temporary file workaround\n");
@@ -406,8 +419,34 @@ void LaunchFunction(char **cmd_argv, char *input_file)
     }
 }
 
-/* LaunchSinglePipe: Execute a pipeline with exactly two commands.
-   Expected format: "left_cmd [args ...] [< infile] | right_cmd [args ...]" */
+/*
+ * LaunchSinglePipe: Execute a pipeline with exactly two commands.
+ *
+ * Expected format:
+ *   "left_cmd [args ...] [< infile] | right_cmd [args ...]"
+ *
+ * Steps:
+ * 1. Split the input line at the "|" character using strtok_r().
+ *    - left_str: the left-hand side command (e.g., "cat < hellos.txt")
+ *    - right_str: the right-hand side command (e.g., "tail -4")
+ * 2. Tokenize left_str:
+ *    - Look for a "<" token to set an input file.
+ *    - Store other tokens in left_tokens.
+ * 3. Tokenize right_str into right_tokens.
+ * 4. Print debug information (the left and right strings and tokens).
+ * 5. Create a pipe using pipe().
+ * 6. Set pipeline_mode = 1.
+ * 7. Fork two child processes:
+ *    - The left child:
+ *        a. If an input file is specified, set it up.
+ *        b. Duplicate the pipe's write end to STDOUT.
+ *        c. Call LaunchFunction() with left_tokens.
+ *    - The right child:
+ *        a. Duplicate the pipe's read end to STDIN.
+ *        b. For commands like "head" or "tail", remove extra file arguments so they read solely from STDIN.
+ *        c. Call LaunchFunction() with right_tokens.
+ * 8. The parent closes the pipe and waits for both children.
+ */
 void LaunchSinglePipe(char *line)
 {
     char *saveptr;
@@ -486,6 +525,7 @@ void LaunchSinglePipe(char *line)
     }
     pipeline_mode = 1;
 
+    /* Fork for left command */
     pid_t pid1 = fork();
     if (pid1 == 0)
     {
@@ -504,19 +544,20 @@ void LaunchSinglePipe(char *line)
         exit(0);
     }
 
+    /* Fork for right command */
     pid_t pid2 = fork();
     if (pid2 == 0)
     {
         dup2(pipe_fd[0], STDIN_FILENO);
         close(pipe_fd[0]);
         close(pipe_fd[1]);
-        /* Special-case: for head and tail, remove extra file arguments so they read only from STDIN */
+        /* For head or tail, remove extra file arguments so the command reads solely from STDIN */
         if (strcmp(right_tokens[0], "head") == 0 || strcmp(right_tokens[0], "tail") == 0)
         {
             int j = 1;
             for (int i = 1; right_tokens[i] != NULL; i++)
             {
-                if (right_tokens[i][0] == '-') // Keep options only
+                if (right_tokens[i][0] == '-') // Keep only option arguments
                     right_tokens[j++] = right_tokens[i];
             }
             right_tokens[j] = NULL;
