@@ -36,8 +36,7 @@ void fix_file_args(char **cmd_argv);
  * fix_file_args:
  * For each argument (except cmd_argv[0]), check if the file exists on the volume.
  * If it does, create a temporary file on the host with its contents and replace the argument.
- *
- * Note: When cwd == "/" we use the filename as provided (without a prepended slash).
+ * (When cwd == "/" we simply use the given filename.)
  */
 void fix_file_args(char **cmd_argv)
 {
@@ -88,8 +87,7 @@ void fix_file_args(char **cmd_argv)
  * setup_input_redirection:
  * Reads a file (given by filename) from the volume into a memory-backed file.
  * Returns a file descriptor for that memory file.
- *
- * Note: When cwd == "/" we now use the filename as provided.
+ * (When cwd == "/" we use the filename as provided.)
  */
 int setup_input_redirection(const char *filename)
 {
@@ -221,10 +219,15 @@ void LaunchFunction(char **cmd_argv, char *input_file)
     int exec_fd = 0;
     char abs_path[MAX_LINE_SIZE];
 
+    /* Construct the absolute path */
     if (strcmp(cwd, "/") == 0)
         snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[0]);
     else
         snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[0]);
+
+    /* Special-case: if the command name starts with "._", strip it */
+    if (strncmp(cmd_argv[0], "._", 2) == 0)
+        cmd_argv[0] += 2;
 
     exec_fd = nqp_open(abs_path);
     if (exec_fd == NQP_FILE_NOT_FOUND)
@@ -285,10 +288,10 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         perror("lseek after header debug");
         return;
     }
-    /* In pipeline mode, if the command is head or tail, skip fixing file arguments */
+    /* If we're in pipeline mode and the command is head or tail, skip fixing file arguments */
     if (!(pipeline_mode && (strcmp(cmd_argv[0], "head") == 0 || strcmp(cmd_argv[0], "tail") == 0)))
         fix_file_args(cmd_argv);
-    /* Execute command: if shell script, use temporary file workaround */
+    /* Execute command: if it's a shell script, use a temporary file workaround */
     if (debug_header[0] == '#' && debug_header[1] == '!')
     {
         printf("Detected shell script, using temporary file workaround\n");
@@ -513,7 +516,7 @@ void LaunchSinglePipe(char *line)
             int j = 1;
             for (int i = 1; right_tokens[i] != NULL; i++)
             {
-                if (right_tokens[i][0] == '-')
+                if (right_tokens[i][0] == '-') // Keep options only
                     right_tokens[j++] = right_tokens[i];
             }
             right_tokens[j] = NULL;
