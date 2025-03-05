@@ -36,6 +36,8 @@ void fix_file_args(char **cmd_argv);
  * fix_file_args:
  * For each argument (except cmd_argv[0]), check if the file exists on the volume.
  * If it does, create a temporary file on the host with its contents and replace the argument.
+ *
+ * Note: When cwd == "/" we now use the filename as provided (without a prepended slash).
  */
 void fix_file_args(char **cmd_argv)
 {
@@ -45,7 +47,7 @@ void fix_file_args(char **cmd_argv)
         if (cmd_argv[i][0] != '/')
         {
             if (strcmp(cwd, "/") == 0)
-                snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[i]);
+                snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[i]); // no extra slash
             else
                 snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[i]);
         }
@@ -86,6 +88,8 @@ void fix_file_args(char **cmd_argv)
  * setup_input_redirection:
  * Reads a file (given by filename) from the volume into a memory-backed file.
  * Returns a file descriptor for that memory file.
+ *
+ * Note: When cwd == "/" we now use the filename as provided.
  */
 int setup_input_redirection(const char *filename)
 {
@@ -93,7 +97,7 @@ int setup_input_redirection(const char *filename)
     if (filename[0] != '/')
     {
         if (strcmp(cwd, "/") == 0)
-            snprintf(input_abs, sizeof(input_abs), "/%s", filename);
+            snprintf(input_abs, sizeof(input_abs), "%s", filename);
         else
             snprintf(input_abs, sizeof(input_abs), "%s/%s", cwd, filename);
     }
@@ -170,7 +174,7 @@ void handle_cd(char *dir)
     if (dir[0] != '/')
     {
         if (strcmp(cwd, "/") == 0)
-            snprintf(path_copy, sizeof(path_copy), "/%s", dir);
+            snprintf(path_copy, sizeof(path_copy), "%s", dir);
         else
             snprintf(path_copy, sizeof(path_copy), "%s/%s", cwd, dir);
     }
@@ -281,11 +285,9 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         perror("lseek after header debug");
         return;
     }
-    /* In pipeline mode and for head, skip fix_file_args */
+    /* In pipeline mode for head, skip fix_file_args */
     if (!(pipeline_mode && strcmp(cmd_argv[0], "head") == 0))
-    {
         fix_file_args(cmd_argv);
-    }
     /* Execute command: determine if shell script or binary */
     if (debug_header[0] == '#' && debug_header[1] == '!')
     {
@@ -410,22 +412,14 @@ void LaunchSinglePipe(char *line)
     char *right_str = strtok_r(NULL, "|", &saveptr);
 
     if (left_str != NULL)
-    {
         printf("Left string: %s\n", left_str);
-    }
     else
-    {
-        printf("Left string: NULL\n"); // Handle the case where left_str is NULL
-    }
+        printf("Left string: NULL\n");
 
     if (right_str != NULL)
-    {
         printf("Right string: %s\n", right_str);
-    }
     else
-    {
-        printf("Right string: NULL\n"); // Handle the case where right_str is NULL
-    }
+        printf("Right string: NULL\n");
 
     if (left_str == NULL || right_str == NULL)
     {
@@ -459,16 +453,11 @@ void LaunchSinglePipe(char *line)
     }
     left_tokens[left_argc] = NULL;
 
-    /* Print left tokens */
     printf("Left tokens:\n");
     for (int i = 0; left_tokens[i] != NULL; i++)
-    {
         printf("  left_tokens[%d]: '%s'\n", i, left_tokens[i]);
-    }
     if (input_file != NULL)
-    {
         printf("Input file: '%s'\n", input_file);
-    }
 
     /* Tokenize right command */
     char *right_tokens[MAX_ARGS];
@@ -482,12 +471,9 @@ void LaunchSinglePipe(char *line)
     }
     right_tokens[right_argc] = NULL;
 
-    /* Print right tokens */
     printf("Right tokens:\n");
     for (int i = 0; right_tokens[i] != NULL; i++)
-    {
         printf("  right_tokens[%d]: '%s'\n", i, right_tokens[i]);
-    }
 
     int pipe_fd[2];
     if (pipe(pipe_fd) == -1)
@@ -495,7 +481,7 @@ void LaunchSinglePipe(char *line)
         perror("pipe");
         return;
     }
-    pipeline_mode = 1; /* We are in pipeline mode now */
+    pipeline_mode = 1;
 
     pid_t pid1 = fork();
     if (pid1 == 0)
@@ -521,7 +507,7 @@ void LaunchSinglePipe(char *line)
         dup2(pipe_fd[0], STDIN_FILENO);
         close(pipe_fd[0]);
         close(pipe_fd[1]);
-        /* Special-case: for head, remove any file argument so it reads solely from STDIN */
+        /* For head, remove extra file arguments so it reads only from STDIN */
         if (strcmp(right_tokens[0], "head") == 0)
         {
             int j = 1;
@@ -540,7 +526,7 @@ void LaunchSinglePipe(char *line)
     close(pipe_fd[1]);
     waitpid(pid1, NULL, 0);
     waitpid(pid2, NULL, 0);
-    pipeline_mode = 0; /* Reset pipeline mode */
+    pipeline_mode = 0;
 }
 
 /* main_pipe: Main loop for our one-pipe shell */
