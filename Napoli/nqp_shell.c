@@ -408,6 +408,25 @@ void LaunchSinglePipe(char *line)
     char *saveptr;
     char *left_str = strtok_r(line, "|", &saveptr);
     char *right_str = strtok_r(NULL, "|", &saveptr);
+
+    if (left_str != NULL)
+    {
+        printf("Left string: %s\n", left_str);
+    }
+    else
+    {
+        printf("Left string: NULL\n"); // Handle the case where left_str is NULL
+    }
+
+    if (right_str != NULL)
+    {
+        printf("Right string: %s\n", right_str);
+    }
+    else
+    {
+        printf("Right string: NULL\n"); // Handle the case where right_str is NULL
+    }
+
     if (left_str == NULL || right_str == NULL)
     {
         fprintf(stderr, "Syntax error: expected two commands separated by a pipe\n");
