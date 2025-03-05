@@ -263,26 +263,39 @@ void handle_ls()
 
     while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
     {
-        // If the entry name contains a '/' not at the very end,
-        // it indicates a nested file. Skip such entries.
+        // Skip AppleDouble metadata files (e.g., "._Juve.txt")
+        if (strncmp(entry.name, "._", 2) == 0)
+        {
+            free(entry.name);
+            continue;
+        }
+
+        // Check for any embedded '/' (i.e. not just a trailing slash)
         char *slash = strchr(entry.name, '/');
         if (slash != NULL)
         {
-            // If slash is not at the end of the name, skip.
             size_t len = strlen(entry.name);
+            // If the slash is not at the very end of the string, then it’s a nested entry.
             if (slash < entry.name + len - 1)
             {
                 free(entry.name);
                 continue;
             }
         }
+
+        // Print the inode number and name.
         printf("%lu %s", entry.inode_number, entry.name);
-        // If the entry is a directory, ensure a trailing slash.
-        if (entry.type == DT_DIR && entry.name[strlen(entry.name) - 1] != '/')
-            putchar('/');
+        // If the entry is a directory and the name doesn’t already end with a slash, add one.
+        if (entry.type == DT_DIR)
+        {
+            size_t len = strlen(entry.name);
+            if (len == 0 || entry.name[len - 1] != '/')
+                putchar('/');
+        }
         putchar('\n');
         free(entry.name);
     }
+
     if (dirents_read == -1)
         fprintf(stderr, "%s is not a directory\n", cwd);
     nqp_close(fd);
