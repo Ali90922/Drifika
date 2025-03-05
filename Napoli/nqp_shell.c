@@ -194,7 +194,7 @@ void handle_pwd()
     printf("%s\n", cwd);
 }
 
-/* handle_cd: Change directory (supports "cd .."). */
+/* handle_cd: Change directory (supports "cd ..") */
 void handle_cd(char *dir)
 {
     if (dir == NULL)
@@ -258,7 +258,7 @@ void handle_ls()
     }
 }
 
-/* LaunchFunction: Execute a single command (without pipes). */
+/* LaunchFunction: Execute a single command (without pipes) */
 void LaunchFunction(char **cmd_argv, char *input_file)
 {
     int exec_fd = 0;
@@ -395,9 +395,7 @@ void LaunchFunction(char **cmd_argv, char *input_file)
                 exit(1);
             }
             fix_file_args(cmd_argv);
-            /* Instead of replacing cmd_argv[0] with the tmp_template,
-               we preserve the original command name as $0.
-               We pass tmp_template as the executable file but leave cmd_argv[0] unchanged. */
+            /* Preserve the original command name as $0 */
             {
                 char *envp[] = {NULL};
                 if (execve(tmp_template, cmd_argv, envp) == -1)
@@ -459,7 +457,6 @@ void LaunchPipeline(char *line)
     char *segments[MAX_PIPE_CMDS];
     int num_cmds = 0;
 
-    // Split the input line on '|'
     char *segment = strtok(line, "|");
     while (segment != NULL && num_cmds < MAX_PIPE_CMDS)
     {
@@ -578,13 +575,9 @@ void LaunchPipelineCommand(char **cmd_argv)
     char abs_path[MAX_LINE_SIZE];
 
     if (strcmp(cwd, "/") == 0)
-    {
         snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[0]);
-    }
     else
-    {
         snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[0]);
-    }
 
     exec_fd = nqp_open(abs_path);
     if (exec_fd == NQP_FILE_NOT_FOUND)
@@ -639,19 +632,18 @@ void LaunchPipelineCommand(char **cmd_argv)
     int is_shell_script = (debug_header[0] == '#' && debug_header[1] == '!');
     if (!is_shell_script)
     {
+        // For binaries, fix file arguments.
         fix_file_args(cmd_argv);
     }
 
     if (is_shell_script)
     {
-        // For shell scripts in pipeline, remove non-option file arguments so that the script reads from STDIN.
+        // For shell scripts in a pipeline, remove non-option arguments so the script reads from STDIN.
         int j = 1;
         for (int i = 1; cmd_argv[i] != NULL; i++)
         {
             if (cmd_argv[i][0] == '-')
-            {
                 cmd_argv[j++] = cmd_argv[i];
-            }
         }
         cmd_argv[j] = NULL;
 
@@ -686,9 +678,6 @@ void LaunchPipelineCommand(char **cmd_argv)
             exit(1);
         }
         close(tmp_fd);
-        /* Instead of replacing cmd_argv[0] with the temporary file name,
-           we pass the temporary file as the executable,
-           but keep cmd_argv[0] as the original command name. */
         {
             char *envp[] = {NULL};
             if (execve(tmp_template, cmd_argv, envp) == -1)
@@ -711,7 +700,7 @@ void LaunchPipelineCommand(char **cmd_argv)
     }
 }
 
-/* setup_input_redirection: Read a file from the volume into memory and return a file descriptor */
+/* setup_input_redirection: Reads a file from the volume into a memory file and returns its descriptor */
 int setup_input_redirection(const char *filename)
 {
     char input_abs[MAX_LINE_SIZE];
