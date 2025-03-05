@@ -96,7 +96,6 @@ int main(int argc, char *argv[], char *envp[])
         exit(EXIT_FAILURE);
     }
 
-    /* Mount exFAT filesystem */
     mount_error = nqp_mount(argv[1], NQP_FS_EXFAT);
     if (mount_error != NQP_OK)
     {
@@ -105,7 +104,6 @@ int main(int argc, char *argv[], char *envp[])
         exit(EXIT_FAILURE);
     }
 
-    /* Shell loop */
     while (1)
     {
         printf("%s:\\> ", cwd);
@@ -118,14 +116,12 @@ int main(int argc, char *argv[], char *envp[])
         if (strlen(line_buffer) == 0)
             continue;
 
-        /* If the line contains a pipe, process it as a pipeline. */
         if (strchr(line_buffer, '|') != NULL)
         {
             LaunchPipeline(line_buffer);
             continue;
         }
 
-        /* Otherwise, process a single command. */
         int token_count = 0;
         char *token = strtok(line_buffer, " ");
         while (token != NULL && token_count < MAX_ARGS - 1)
@@ -137,7 +133,6 @@ int main(int argc, char *argv[], char *envp[])
         if (token_count == 0)
             continue;
 
-        /* Handle built-in commands */
         if (strcmp(tokens[0], "exit") == 0)
         {
             printf("Exiting shell...\n");
@@ -159,7 +154,6 @@ int main(int argc, char *argv[], char *envp[])
             continue;
         }
 
-        /* Process input redirection for a single command. */
         char *cmd_argv[MAX_ARGS];
         int cmd_argc = 0;
         char *input_file = NULL;
@@ -170,7 +164,7 @@ int main(int argc, char *argv[], char *envp[])
                 if (i + 1 < token_count)
                 {
                     input_file = tokens[i + 1];
-                    i++; // Skip the filename token.
+                    i++;
                 }
                 else
                 {
@@ -237,7 +231,7 @@ void handle_cd(char *dir)
         fprintf(stderr, "Directory %s not found\n", path_copy);
 }
 
-/* handle_ls: List directory contents (immediate children only). */
+/* handle_ls: List directory contents */
 void handle_ls()
 {
     nqp_dirent entry = {0};
@@ -270,8 +264,6 @@ void LaunchFunction(char **cmd_argv, char *input_file)
     int exec_fd = 0;
     char abs_path[MAX_LINE_SIZE];
 
-    /* Build absolute path for the command.
-       When cwd is "/" use the command name as is. */
     if (strcmp(cwd, "/") == 0)
         snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[0]);
     else
@@ -340,9 +332,6 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         return;
     }
 
-    /* Fork and execute the command.
-       Set up input redirection if specified.
-       Fix file arguments so that files on the volume are replaced with temporary host files. */
     if (debug_header[0] == '#' && debug_header[1] == '!')
     {
         printf("Detected shell script, using temporary file workaround\n");
@@ -406,7 +395,9 @@ void LaunchFunction(char **cmd_argv, char *input_file)
                 exit(1);
             }
             fix_file_args(cmd_argv);
-            cmd_argv[0] = tmp_template;
+            /* Instead of replacing cmd_argv[0] with the tmp_template,
+               we preserve the original command name as $0.
+               We pass tmp_template as the executable file but leave cmd_argv[0] unchanged. */
             {
                 char *envp[] = {NULL};
                 if (execve(tmp_template, cmd_argv, envp) == -1)
@@ -468,7 +459,7 @@ void LaunchPipeline(char *line)
     char *segments[MAX_PIPE_CMDS];
     int num_cmds = 0;
 
-    // Split the input line on the '|' character.
+    // Split the input line on '|'
     char *segment = strtok(line, "|");
     while (segment != NULL && num_cmds < MAX_PIPE_CMDS)
     {
@@ -476,7 +467,6 @@ void LaunchPipeline(char *line)
         segment = strtok(NULL, "|");
     }
 
-    // For each segment, tokenize into arguments.
     struct Command
     {
         char *args[MAX_ARGS];
@@ -654,13 +644,14 @@ void LaunchPipelineCommand(char **cmd_argv)
 
     if (is_shell_script)
     {
-        // For shell scripts in a pipeline, remove file arguments so they read from STDIN.
-        // Here we remove any argument that does not start with '-' (options).
+        // For shell scripts in pipeline, remove non-option file arguments so that the script reads from STDIN.
         int j = 1;
         for (int i = 1; cmd_argv[i] != NULL; i++)
         {
             if (cmd_argv[i][0] == '-')
+            {
                 cmd_argv[j++] = cmd_argv[i];
+            }
         }
         cmd_argv[j] = NULL;
 
@@ -695,7 +686,9 @@ void LaunchPipelineCommand(char **cmd_argv)
             exit(1);
         }
         close(tmp_fd);
-        cmd_argv[0] = tmp_template;
+        /* Instead of replacing cmd_argv[0] with the temporary file name,
+           we pass the temporary file as the executable,
+           but keep cmd_argv[0] as the original command name. */
         {
             char *envp[] = {NULL};
             if (execve(tmp_template, cmd_argv, envp) == -1)
@@ -718,7 +711,7 @@ void LaunchPipelineCommand(char **cmd_argv)
     }
 }
 
-/* setup_input_redirection: Read a file from the volume into a memory file and return its descriptor */
+/* setup_input_redirection: Read a file from the volume into memory and return a file descriptor */
 int setup_input_redirection(const char *filename)
 {
     char input_abs[MAX_LINE_SIZE];
