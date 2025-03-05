@@ -29,6 +29,62 @@ void LaunchFunction(char **cmd_argv, char *input_file);
 void LaunchPipeline(char *line);
 void LaunchPipelineCommand(char **cmd_argv);
 int setup_input_redirection(const char *filename);
+void fix_file_args(char **cmd_argv);
+
+/*
+ * fix_file_args:
+ * For every argument (except the first, which is the command name), check if the file exists on the volume.
+ * If so, create a temporary file on the host and copy the file contents into it,
+ * then replace the argument with the temporary file’s path.
+ */
+void fix_file_args(char **cmd_argv)
+{
+    for (int i = 1; cmd_argv[i] != NULL; i++)
+    {
+        // Build an absolute path based on cwd if needed.
+        char abs_path[MAX_LINE_SIZE];
+        if (cmd_argv[i][0] != '/')
+        {
+            if (strcmp(cwd, "/") == 0)
+                snprintf(abs_path, sizeof(abs_path), "/%s", cmd_argv[i]);
+            else
+                snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[i]);
+        }
+        else
+        {
+            strncpy(abs_path, cmd_argv[i], sizeof(abs_path));
+        }
+
+        int fd = nqp_open(abs_path);
+        if (fd != NQP_FILE_NOT_FOUND)
+        {
+            // We found the file on the volume—create a temporary file.
+            char tmp_template[] = "/tmp/volfileXXXXXX";
+            int tmp_fd = mkstemp(tmp_template);
+            if (tmp_fd == -1)
+            {
+                perror("mkstemp for file argument");
+                close(fd);
+                continue;
+            }
+            ssize_t r, w;
+            char buf[BUFFER_SIZE];
+            while ((r = nqp_read(fd, buf, BUFFER_SIZE)) > 0)
+            {
+                w = write(tmp_fd, buf, r);
+                if (w != r)
+                {
+                    perror("write to temporary file for argument");
+                    break;
+                }
+            }
+            close(tmp_fd);
+            nqp_close(fd);
+            // Replace the argument with a duplicate of the temporary filename.
+            cmd_argv[i] = strdup(tmp_template);
+        }
+    }
+}
 
 int main(int argc, char *argv[], char *envp[])
 {
@@ -303,7 +359,9 @@ void LaunchFunction(char **cmd_argv, char *input_file)
     }
 
     /* Fork and execute the command.
-       Also sets up input redirection (if any) before exec. */
+       Also sets up input redirection (if any) before exec.
+       Before exec, fix file arguments so that file names (like Juve.txt) are replaced
+       with temporary file paths containing the file's contents from the mounted volume. */
     if (debug_header[0] == '#' && debug_header[1] == '!')
     {
         printf("Detected shell script, using temporary file workaround\n");
@@ -366,6 +424,8 @@ void LaunchFunction(char **cmd_argv, char *input_file)
                 perror("chdir");
                 exit(1);
             }
+            // Fix file arguments before exec (for example, replace "Juve.txt" with temporary file)
+            fix_file_args(cmd_argv);
             cmd_argv[0] = tmp_template;
             {
                 char *envp[] = {NULL};
@@ -404,6 +464,8 @@ void LaunchFunction(char **cmd_argv, char *input_file)
                 }
                 close(input_fd);
             }
+            // Fix file arguments before exec.
+            fix_file_args(cmd_argv);
             {
                 char *envp[] = {NULL};
                 if (fexecve(InMemoryFile, cmd_argv, envp) == -1)
@@ -528,7 +590,7 @@ void LaunchPipeline(char *line)
                 }
                 close(input_fd);
             }
-            // Execute the command.
+            // Fix file arguments and execute the command.
             LaunchPipelineCommand(commands[i].args);
             exit(1); // Should not reach here.
         }
@@ -675,6 +737,8 @@ void LaunchPipelineCommand(char **cmd_argv)
         }
         {
             char *envp[] = {NULL};
+            // Fix file arguments before executing.
+            fix_file_args(cmd_argv);
             if (fexecve(InMemoryFile, cmd_argv, envp) == -1)
             {
                 perror("fexecve");
