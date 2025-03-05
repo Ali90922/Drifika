@@ -585,7 +585,7 @@ void LaunchPipelineCommand(char **cmd_argv)
 
     ssize_t bytes_read, bytes_written;
     char buffer[BUFFER_SIZE];
-    size_t total_bytes = 0;
+    // size_t total_bytes = 0;
     while ((bytes_read = nqp_read(exec_fd, buffer, BUFFER_SIZE)) > 0)
     {
         total_bytes += bytes_read;
