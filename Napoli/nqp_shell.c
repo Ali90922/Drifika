@@ -17,7 +17,7 @@
 #define MAX_LINE_SIZE 256
 #define MAX_ARGS 20
 
-// Global variable for current working directory (cwd)
+// Global current working directory
 char cwd[MAX_LINE_SIZE] = "/";
 
 /* Function declarations */
@@ -31,9 +31,8 @@ void fix_file_args(char **cmd_argv);
 
 /*
  * fix_file_args:
- * For every argument (except the first, which is the command name), check if the file exists on the volume.
- * If so, create a temporary file on the host and copy the file contents into it,
- * then replace the argument with the temporary file’s path.
+ * For each argument (except the command name), check if the file exists on the volume.
+ * If it does, create a temporary file on the host with its contents and replace the argument.
  */
 void fix_file_args(char **cmd_argv)
 {
@@ -82,8 +81,8 @@ void fix_file_args(char **cmd_argv)
 
 /*
  * setup_input_redirection:
- * Reads a file from the volume (given its name) into a memory-backed file.
- * Returns a file descriptor for the in-memory file (to be dup2'ed to STDIN) or -1 on error.
+ * Loads a file from the volume (using an absolute path derived from cwd) into memory.
+ * Returns a file descriptor for the in-memory file to be dup2’ed to STDIN.
  */
 int setup_input_redirection(const char *filename)
 {
@@ -252,7 +251,6 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         fprintf(stderr, "Error reading the source file\n");
         return;
     }
-
     if (fchmod(InMemoryFile, 0755) == -1)
     {
         perror("fchmod");
@@ -263,7 +261,6 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         perror("lseek before header debug");
         return;
     }
-
     unsigned char debug_header[16];
     ssize_t n = read(InMemoryFile, debug_header, sizeof(debug_header));
     if (n != sizeof(debug_header))
@@ -276,18 +273,15 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         printf("%02x ", debug_header[i]);
     printf("\n");
     fflush(stdout);
-
     if (lseek(InMemoryFile, 0, SEEK_SET) == -1)
     {
         perror("lseek after header debug");
         return;
     }
-
     if (debug_header[0] == '#' && debug_header[1] == '!')
     {
         printf("Detected shell script, using temporary file workaround\n");
         fflush(stdout);
-
         char tmp_template[] = "/tmp/scriptXXXXXX";
         int tmp_fd = mkstemp(tmp_template);
         if (tmp_fd == -1)
@@ -319,7 +313,6 @@ void LaunchFunction(char **cmd_argv, char *input_file)
             exit(1);
         }
         close(tmp_fd);
-
         pid_t pid = fork();
         if (pid == -1)
         {
@@ -402,29 +395,29 @@ void LaunchFunction(char **cmd_argv, char *input_file)
 }
 
 /* LaunchSinglePipe: Supports a single pipe between two commands.
-   The input line is assumed to be of the form:
-   "left_cmd [args ...] [< infile] | right_cmd [args ...]" */
+   Expected format: "left_cmd [args ...] [< infile] | right_cmd [args ...]" */
 void LaunchSinglePipe(char *line)
 {
-    // Split the line into left and right parts.
-    char *left_str = strtok(line, "|");
-    char *right_str = strtok(NULL, "|");
+    char *saveptr_pipe;
+    char *left_str = strtok_r(line, "|", &saveptr_pipe);
+    char *right_str = strtok_r(NULL, "|", &saveptr_pipe);
     if (left_str == NULL || right_str == NULL)
     {
         fprintf(stderr, "Syntax error: expected two commands separated by a pipe\n");
         return;
     }
 
-    // Tokenize left command.
+    // Tokenize left command
     char *left_tokens[MAX_ARGS];
     int left_argc = 0;
     char *input_file = NULL;
-    char *token = strtok(left_str, " ");
+    char *saveptr_left;
+    char *token = strtok_r(left_str, " ", &saveptr_left);
     while (token != NULL && left_argc < MAX_ARGS - 1)
     {
         if (strcmp(token, "<") == 0)
         {
-            token = strtok(NULL, " ");
+            token = strtok_r(NULL, " ", &saveptr_left);
             if (token == NULL)
             {
                 fprintf(stderr, "Syntax error: no input file specified\n");
@@ -436,18 +429,19 @@ void LaunchSinglePipe(char *line)
         {
             left_tokens[left_argc++] = token;
         }
-        token = strtok(NULL, " ");
+        token = strtok_r(NULL, " ", &saveptr_left);
     }
     left_tokens[left_argc] = NULL;
 
-    // Tokenize right command.
+    // Tokenize right command
     char *right_tokens[MAX_ARGS];
     int right_argc = 0;
-    token = strtok(right_str, " ");
+    char *saveptr_right;
+    token = strtok_r(right_str, " ", &saveptr_right);
     while (token != NULL && right_argc < MAX_ARGS - 1)
     {
         right_tokens[right_argc++] = token;
-        token = strtok(NULL, " ");
+        token = strtok_r(NULL, " ", &saveptr_right);
     }
     right_tokens[right_argc] = NULL;
 
@@ -461,7 +455,7 @@ void LaunchSinglePipe(char *line)
     pid_t pid1 = fork();
     if (pid1 == 0)
     {
-        // Left command: set up output to pipe.
+        // Left command: write to pipe.
         if (input_file != NULL)
         {
             int in_fd = setup_input_redirection(input_file);
@@ -480,17 +474,17 @@ void LaunchSinglePipe(char *line)
     pid_t pid2 = fork();
     if (pid2 == 0)
     {
-        // Right command: set up input from pipe.
+        // Right command: read from pipe.
         dup2(pipe_fd[0], STDIN_FILENO);
         close(pipe_fd[0]);
         close(pipe_fd[1]);
-        /* For commands like head, remove any file arguments so it reads from STDIN */
+        /* Special-case for head: remove any file argument so it reads from STDIN */
         if (strcmp(right_tokens[0], "head") == 0)
         {
             int j = 1;
             for (int i = 1; right_tokens[i] != NULL; i++)
             {
-                if (right_tokens[i][0] == '-')
+                if (right_tokens[i][0] == '-') // Keep options
                     right_tokens[j++] = right_tokens[i];
             }
             right_tokens[j] = NULL;
@@ -505,7 +499,7 @@ void LaunchSinglePipe(char *line)
     waitpid(pid2, NULL, 0);
 }
 
-/* main_pipe: The shell's main loop for our one-pipe version */
+/* main_pipe: Our main loop for the one-pipe shell */
 int main_pipe(int argc, char *argv[], char *envp[])
 {
     char line_buffer[MAX_LINE_SIZE] = {0};
