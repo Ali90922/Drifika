@@ -17,8 +17,11 @@
 #define MAX_LINE_SIZE 256
 #define MAX_ARGS 20
 
-// Global current working directory
+/* Global current working directory */
 char cwd[MAX_LINE_SIZE] = "/";
+
+/* Global flag: set to 1 when executing a pipeline */
+int pipeline_mode = 0;
 
 /* Function declarations */
 void handle_cd(char *dir);
@@ -31,7 +34,7 @@ void fix_file_args(char **cmd_argv);
 
 /*
  * fix_file_args:
- * For each argument (except the command name), check if the file exists on the volume.
+ * For each argument (except cmd_argv[0]), check if the file exists on the volume.
  * If it does, create a temporary file on the host with its contents and replace the argument.
  */
 void fix_file_args(char **cmd_argv)
@@ -81,8 +84,8 @@ void fix_file_args(char **cmd_argv)
 
 /*
  * setup_input_redirection:
- * Loads a file from the volume (using an absolute path derived from cwd) into memory.
- * Returns a file descriptor for the in-memory file to be dup2’ed to STDIN.
+ * Reads a file (given by filename) from the volume into a memory-backed file.
+ * Returns a file descriptor for that memory file.
  */
 int setup_input_redirection(const char *filename)
 {
@@ -144,7 +147,7 @@ void handle_pwd(void)
     printf("%s\n", cwd);
 }
 
-/* handle_cd: Change directory. Supports "cd .." */
+/* handle_cd: Change directory; supports "cd .." */
 void handle_cd(char *dir)
 {
     if (dir == NULL)
@@ -181,7 +184,7 @@ void handle_cd(char *dir)
         fprintf(stderr, "Directory %s not found\n", path_copy);
 }
 
-/* handle_ls: List directory contents */
+/* handle_ls: List the contents of the current directory */
 void handle_ls(void)
 {
     nqp_dirent entry = {0};
@@ -278,6 +281,12 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         perror("lseek after header debug");
         return;
     }
+    /* In pipeline mode and for head, skip fix_file_args */
+    if (!(pipeline_mode && strcmp(cmd_argv[0], "head") == 0))
+    {
+        fix_file_args(cmd_argv);
+    }
+    /* Execute command: determine if shell script or binary */
     if (debug_header[0] == '#' && debug_header[1] == '!')
     {
         printf("Detected shell script, using temporary file workaround\n");
@@ -338,7 +347,6 @@ void LaunchFunction(char **cmd_argv, char *input_file)
                 perror("chdir");
                 exit(1);
             }
-            fix_file_args(cmd_argv);
             {
                 char *envp[] = {NULL};
                 if (execve(tmp_template, cmd_argv, envp) == -1)
@@ -376,7 +384,6 @@ void LaunchFunction(char **cmd_argv, char *input_file)
                 }
                 close(input_fd);
             }
-            fix_file_args(cmd_argv);
             {
                 char *envp[] = {NULL};
                 if (fexecve(InMemoryFile, cmd_argv, envp) == -1)
@@ -394,20 +401,19 @@ void LaunchFunction(char **cmd_argv, char *input_file)
     }
 }
 
-/* LaunchSinglePipe: Supports a single pipe between two commands.
+/* LaunchSinglePipe: Execute a pipeline with exactly two commands.
    Expected format: "left_cmd [args ...] [< infile] | right_cmd [args ...]" */
 void LaunchSinglePipe(char *line)
 {
-    char *saveptr_pipe;
-    char *left_str = strtok_r(line, "|", &saveptr_pipe);
-    char *right_str = strtok_r(NULL, "|", &saveptr_pipe);
+    char *saveptr;
+    char *left_str = strtok_r(line, "|", &saveptr);
+    char *right_str = strtok_r(NULL, "|", &saveptr);
     if (left_str == NULL || right_str == NULL)
     {
         fprintf(stderr, "Syntax error: expected two commands separated by a pipe\n");
         return;
     }
-
-    // Tokenize left command
+    /* Tokenize left command */
     char *left_tokens[MAX_ARGS];
     int left_argc = 0;
     char *input_file = NULL;
@@ -433,7 +439,7 @@ void LaunchSinglePipe(char *line)
     }
     left_tokens[left_argc] = NULL;
 
-    // Tokenize right command
+    /* Tokenize right command */
     char *right_tokens[MAX_ARGS];
     int right_argc = 0;
     char *saveptr_right;
@@ -451,11 +457,11 @@ void LaunchSinglePipe(char *line)
         perror("pipe");
         return;
     }
+    pipeline_mode = 1; /* We are in pipeline mode now */
 
     pid_t pid1 = fork();
     if (pid1 == 0)
     {
-        // Left command: write to pipe.
         if (input_file != NULL)
         {
             int in_fd = setup_input_redirection(input_file);
@@ -474,17 +480,16 @@ void LaunchSinglePipe(char *line)
     pid_t pid2 = fork();
     if (pid2 == 0)
     {
-        // Right command: read from pipe.
         dup2(pipe_fd[0], STDIN_FILENO);
         close(pipe_fd[0]);
         close(pipe_fd[1]);
-        /* Special-case for head: remove any file argument so it reads from STDIN */
+        /* Special-case: for head, remove any file argument so it reads solely from STDIN */
         if (strcmp(right_tokens[0], "head") == 0)
         {
             int j = 1;
             for (int i = 1; right_tokens[i] != NULL; i++)
             {
-                if (right_tokens[i][0] == '-') // Keep options
+                if (right_tokens[i][0] == '-')
                     right_tokens[j++] = right_tokens[i];
             }
             right_tokens[j] = NULL;
@@ -497,9 +502,10 @@ void LaunchSinglePipe(char *line)
     close(pipe_fd[1]);
     waitpid(pid1, NULL, 0);
     waitpid(pid2, NULL, 0);
+    pipeline_mode = 0; /* Reset pipeline mode */
 }
 
-/* main_pipe: Our main loop for the one-pipe shell */
+/* main_pipe: Main loop for our one-pipe shell */
 int main_pipe(int argc, char *argv[], char *envp[])
 {
     char line_buffer[MAX_LINE_SIZE] = {0};
@@ -532,13 +538,11 @@ int main_pipe(int argc, char *argv[], char *envp[])
         line_buffer[strcspn(line_buffer, "\n")] = '\0';
         if (strlen(line_buffer) == 0)
             continue;
-
         if (strchr(line_buffer, '|') != NULL)
         {
             LaunchSinglePipe(line_buffer);
             continue;
         }
-
         int token_count = 0;
         char *token = strtok(line_buffer, " ");
         while (token != NULL && token_count < MAX_ARGS - 1)
@@ -549,7 +553,6 @@ int main_pipe(int argc, char *argv[], char *envp[])
         tokens[token_count] = NULL;
         if (token_count == 0)
             continue;
-
         if (strcmp(tokens[0], "exit") == 0)
         {
             printf("Exiting shell...\n");
@@ -570,7 +573,6 @@ int main_pipe(int argc, char *argv[], char *envp[])
             handle_cd(tokens[1]);
             continue;
         }
-
         char *cmd_argv[MAX_ARGS];
         int cmd_argc = 0;
         char *input_file = NULL;
@@ -598,10 +600,8 @@ int main_pipe(int argc, char *argv[], char *envp[])
         cmd_argv[cmd_argc] = NULL;
         if (cmd_argc == 0)
             continue;
-
         LaunchFunction(cmd_argv, input_file);
     }
-
     return EXIT_SUCCESS;
 }
 
