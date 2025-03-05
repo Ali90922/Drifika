@@ -521,21 +521,25 @@ void LaunchSinglePipe(char *line)
     if (pipe(pipe_fd) == -1)
     {
         perror("pipe");
+        printf("Pipes not allocated\n");
         return;
     }
+
+    // Pipes are llocated
     pipeline_mode = 1;
 
     /* Fork for left command */
     pid_t pid1 = fork();
     if (pid1 == 0)
     {
-        if (input_file != NULL)
+        if (input_file != NULL) // Only oges into this sub- condition if th einput redirection is on -- For now Let's test it with this being off
         {
             int in_fd = setup_input_redirection(input_file);
             if (in_fd == -1)
                 exit(1);
             dup2(in_fd, STDIN_FILENO);
             close(in_fd);
+            printf("Input ReDirection Process is taking place \n");
         }
         dup2(pipe_fd[1], STDOUT_FILENO);
         close(pipe_fd[0]);
