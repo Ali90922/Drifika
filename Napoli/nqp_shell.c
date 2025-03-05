@@ -248,6 +248,7 @@ void handle_cd(char *dir)
 }
 
 /* Built-in: List directory contents */
+// Copied the code from last assignment and modified it slightly
 void handle_ls()
 {
     nqp_dirent entry = {0};
@@ -257,21 +258,34 @@ void handle_ls()
     if (fd == NQP_FILE_NOT_FOUND)
     {
         fprintf(stderr, "%s not found\n", cwd);
+        return;
     }
-    else
+
+    while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
     {
-        while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
+        // If the entry name contains a '/' not at the very end,
+        // it indicates a nested file. Skip such entries.
+        char *slash = strchr(entry.name, '/');
+        if (slash != NULL)
         {
-            printf("%lu %s", entry.inode_number, entry.name);
-            if (entry.type == DT_DIR)
-                putchar('/');
-            putchar('\n');
-            free(entry.name);
+            // If slash is not at the end of the name, skip.
+            size_t len = strlen(entry.name);
+            if (slash < entry.name + len - 1)
+            {
+                free(entry.name);
+                continue;
+            }
         }
-        if (dirents_read == -1)
-            fprintf(stderr, "%s is not a directory\n", cwd);
-        nqp_close(fd);
+        printf("%lu %s", entry.inode_number, entry.name);
+        // If the entry is a directory, ensure a trailing slash.
+        if (entry.type == DT_DIR && entry.name[strlen(entry.name) - 1] != '/')
+            putchar('/');
+        putchar('\n');
+        free(entry.name);
     }
+    if (dirents_read == -1)
+        fprintf(stderr, "%s is not a directory\n", cwd);
+    nqp_close(fd);
 }
 
 /* LaunchFunction: For a single command (without pipes) */
