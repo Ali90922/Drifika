@@ -571,9 +571,10 @@ void LaunchSinglePipe(char *line)
     pid_t pid2 = fork();
     if (pid2 == 0)
     {
-        /* For right command, pass the pipe's read end as the input override.
-           Do not perform dup2 here; LaunchFunction will handle it. */
+        /* For right command, duplicate the pipe's read end to avoid it occupying fd 0 */
         close(pipe_fd[1]);
+        int pipe_read_dup = dup(pipe_fd[0]);
+        close(pipe_fd[0]);
         if (strcmp(right_tokens[0], "head") == 0 || strcmp(right_tokens[0], "tail") == 0)
         {
             int j = 1;
@@ -584,7 +585,7 @@ void LaunchSinglePipe(char *line)
             }
             right_tokens[j] = NULL;
         }
-        LaunchFunction(right_tokens, NULL, pipe_fd[0]);
+        LaunchFunction(right_tokens, NULL, pipe_read_dup);
         exit(0);
     }
 
