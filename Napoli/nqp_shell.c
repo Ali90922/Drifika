@@ -549,12 +549,15 @@ void LaunchSinglePipe(char *line)
             close(in_fd);
             printf("Input ReDirection Process is taking place \n");
         }
+
         // Duplicate the write end of the pipe to standard output
+
         if (dup2(pipe_fd[1], STDOUT_FILENO) == -1)
         {
             perror("dup2 failed");
             exit(1);
         }
+        printf("Check 6\n");
         printf("[DEBUG] STDOUT now set to pipe_fd[1]: %d\n", pipe_fd[1]);
 
         // Close the unused read end of the pipe in this child process
@@ -563,6 +566,7 @@ void LaunchSinglePipe(char *line)
             perror("close pipe_fd[0] failed");
             exit(1);
         }
+        printf("Check 7\n");
         printf("[DEBUG] Closed pipe_fd[0]\n");
 
         // Close the original write end after duplication; STDOUT is still open
