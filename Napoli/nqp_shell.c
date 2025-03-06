@@ -27,7 +27,8 @@ int pipeline_mode = 0;
 void handle_cd(char *dir);
 void handle_pwd(void);
 void handle_ls(void);
-void LaunchFunction(char **cmd_argv, char *input_file);
+/* Updated LaunchFunction now accepts an override FD (-1 means no override) */
+void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override);
 void LaunchSinglePipe(char *line);
 int setup_input_redirection(const char *filename);
 void fix_file_args(char **cmd_argv);
@@ -36,7 +37,6 @@ void fix_file_args(char **cmd_argv);
  * fix_file_args:
  * For each argument (except cmd_argv[0] which is the command name), check if the file exists on the volume.
  * If it does, create a temporary file on the host with its contents and then replace the argument with the temporary file's path.
- * When cwd == "/" we use the given filename as-is.
  */
 void fix_file_args(char **cmd_argv)
 {
@@ -87,7 +87,6 @@ void fix_file_args(char **cmd_argv)
  * setup_input_redirection:
  * Reads a file (given by filename) from the volume into a memory-backed file.
  * Returns a file descriptor for that memory file.
- * When cwd == "/" we use the filename as provided.
  */
 int setup_input_redirection(const char *filename)
 {
@@ -213,17 +212,12 @@ void handle_ls(void)
     }
 }
 
-/* LaunchFunction: Execute a single command (without a pipe)
- *
- * Steps:
- * 1. Build the absolute path for the command.
- * 2. (Optionally) Strip a leading "._" from the command name.
- * 3. Open the file from the volume and load its contents into an in‑memory file.
- * 4. Read the header of the in‑memory file to check if it is a shell script (i.e. starts with "#!").
- * 5. If not in pipeline mode for head/tail, call fix_file_args to process file arguments.
- * 6. Fork and execute the command. For shell scripts, use a temporary file workaround.
+/*
+ * LaunchFunction: Execute a single command (with or without a pipe).
+ * The new parameter "input_fd_override" lets us pass an alternate FD (e.g. the pipe's read end)
+ * for input redirection. Pass -1 if not used.
  */
-void LaunchFunction(char **cmd_argv, char *input_file)
+void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
 {
     int exec_fd = 0;
     char abs_path[MAX_LINE_SIZE];
@@ -300,11 +294,7 @@ void LaunchFunction(char **cmd_argv, char *input_file)
     if (!(pipeline_mode && (strcmp(cmd_argv[0], "head") == 0 || strcmp(cmd_argv[0], "tail") == 0)))
         fix_file_args(cmd_argv);
 
-    /* Execute command:
-       - If the in-memory file starts with "#!" it’s considered a shell script.
-         In that case, we use a temporary file workaround.
-       - Otherwise, we assume it’s a binary and use fexecve.
-    */
+    /* If the file starts with "#!" it is considered a shell script */
     if (debug_header[0] == '#' && debug_header[1] == '!')
     {
         printf("Detected shell script, using temporary file workaround\n");
@@ -348,11 +338,20 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         }
         if (pid == 0)
         {
-            if (input_file != NULL)
+            /* Unified input redirection block for shell script branch */
+            if (input_file != NULL || input_fd_override != -1)
             {
-                int input_fd = setup_input_redirection(input_file);
-                if (input_fd == -1)
-                    exit(1);
+                int input_fd;
+                if (input_file != NULL)
+                {
+                    input_fd = setup_input_redirection(input_file);
+                    if (input_fd == -1)
+                        exit(1);
+                }
+                else
+                {
+                    input_fd = input_fd_override;
+                }
                 if (dup2(input_fd, STDIN_FILENO) == -1)
                 {
                     perror("dup2 for input");
@@ -390,11 +389,20 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         }
         if (pid == 0)
         {
-            if (input_file != NULL)
+            /* Unified input redirection block for binary branch */
+            if (input_file != NULL || input_fd_override != -1)
             {
-                int input_fd = setup_input_redirection(input_file);
-                if (input_fd == -1)
-                    exit(1);
+                int input_fd;
+                if (input_file != NULL)
+                {
+                    input_fd = setup_input_redirection(input_file);
+                    if (input_fd == -1)
+                        exit(1);
+                }
+                else
+                {
+                    input_fd = input_fd_override;
+                }
                 if (dup2(input_fd, STDIN_FILENO) == -1)
                 {
                     perror("dup2 for input");
@@ -421,31 +429,8 @@ void LaunchFunction(char **cmd_argv, char *input_file)
 
 /*
  * LaunchSinglePipe: Execute a pipeline with exactly two commands.
- *
  * Expected format:
  *   "left_cmd [args ...] [< infile] | right_cmd [args ...]"
- *
- * Steps:
- * 1. Split the input line at the "|" character using strtok_r().
- *    - left_str: the left-hand side command (e.g., "cat < hellos.txt")
- *    - right_str: the right-hand side command (e.g., "tail -4")
- * 2. Tokenize left_str:
- *    - Look for a "<" token to set an input file.
- *    - Store other tokens in left_tokens.
- * 3. Tokenize right_str into right_tokens.
- * 4. Print debug information (the left and right strings and tokens).
- * 5. Create a pipe using pipe().
- * 6. Set pipeline_mode = 1.
- * 7. Fork two child processes:
- *    - The left child:
- *        a. If an input file is specified, set it up.
- *        b. Duplicate the pipe's write end to STDOUT.
- *        c. Call LaunchFunction() with left_tokens.
- *    - The right child:
- *        a. Duplicate the pipe's read end to STDIN.
- *        b. For commands like "head" or "tail", remove extra file arguments so they read solely from STDIN.
- *        c. Call LaunchFunction() with right_tokens.
- * 8. The parent closes the pipe and waits for both children.
  */
 void LaunchSinglePipe(char *line)
 {
@@ -527,7 +512,6 @@ void LaunchSinglePipe(char *line)
     }
     printf("Check 2\n");
 
-    // Pipes are llocated
     pipeline_mode = 1;
 
     printf("Check 3\n");
@@ -538,19 +522,19 @@ void LaunchSinglePipe(char *line)
     if (pid1 == 0)
     {
         printf("Check 5\n");
-        if (input_file != NULL) // Only oges into this sub- condition if th einput redirection is on -- For now Let's test it with this being off
+        if (input_file != NULL)
         {
             int in_fd = setup_input_redirection(input_file);
-            printf("Input ReDirection Process is taking place \n");
             if (in_fd == -1)
                 exit(1);
-            printf("Input ReDirection Process is taking place \n");
-            dup2(in_fd, STDIN_FILENO);
+            if (dup2(in_fd, STDIN_FILENO) == -1)
+            {
+                perror("dup2 for input");
+                exit(1);
+            }
             close(in_fd);
-            printf("Input ReDirection Process is taking place \n");
         }
 
-        // Duplicate the write end of the pipe to standard output
         printf("Check 11\n");
 
         if (dup2(pipe_fd[1], STDOUT_FILENO) == -1)
@@ -559,13 +543,9 @@ void LaunchSinglePipe(char *line)
             exit(1);
         }
 
-        // fd[0] The read end of the pipe
-        // fd[1] The write end of the pipe
-
         printf("Check 6\n");
         printf("[DEBUG] STDOUT now set to pipe_fd[1]: %d\n", pipe_fd[1]);
 
-        // Close the unused read end of the pipe in this child process
         if (close(pipe_fd[0]) == -1)
         {
             perror("close pipe_fd[0] failed");
@@ -574,7 +554,6 @@ void LaunchSinglePipe(char *line)
         printf("Check 7\n");
         printf("[DEBUG] Closed pipe_fd[0]\n");
 
-        // Close the original write end after duplication; STDOUT is still open
         if (close(pipe_fd[1]) == -1)
         {
             perror("close pipe_fd[1] failed");
@@ -582,9 +561,9 @@ void LaunchSinglePipe(char *line)
         }
         printf("[DEBUG] Closed pipe_fd[1]\n");
 
-        // Now execute the left command; its output will be sent to the pipe
         printf("[DEBUG] Executing left command...\n");
-        LaunchFunction(left_tokens, NULL);
+        /* Pass -1 as no override FD for left command */
+        LaunchFunction(left_tokens, input_file, -1);
         exit(0);
     }
 
@@ -592,21 +571,20 @@ void LaunchSinglePipe(char *line)
     pid_t pid2 = fork();
     if (pid2 == 0)
     {
-        dup2(pipe_fd[0], STDIN_FILENO);
-        close(pipe_fd[0]);
+        /* For right command, pass the pipe's read end as the input override.
+           Do not perform dup2 here; LaunchFunction will handle it. */
         close(pipe_fd[1]);
-        /* For head or tail, remove extra file arguments so the command reads solely from STDIN */
         if (strcmp(right_tokens[0], "head") == 0 || strcmp(right_tokens[0], "tail") == 0)
         {
             int j = 1;
             for (int i = 1; right_tokens[i] != NULL; i++)
             {
-                if (right_tokens[i][0] == '-') // Keep only option arguments
+                if (right_tokens[i][0] == '-')
                     right_tokens[j++] = right_tokens[i];
             }
             right_tokens[j] = NULL;
         }
-        LaunchFunction(right_tokens, NULL);
+        LaunchFunction(right_tokens, NULL, pipe_fd[0]);
         exit(0);
     }
 
@@ -712,7 +690,7 @@ int main_pipe(int argc, char *argv[], char *envp[])
         cmd_argv[cmd_argc] = NULL;
         if (cmd_argc == 0)
             continue;
-        LaunchFunction(cmd_argv, input_file);
+        LaunchFunction(cmd_argv, input_file, -1);
     }
     return EXIT_SUCCESS;
 }
