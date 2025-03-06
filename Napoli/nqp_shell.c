@@ -551,6 +551,7 @@ void LaunchSinglePipe(char *line)
         }
 
         // Duplicate the write end of the pipe to standard output
+        printf("Check 11\n");
 
         if (dup2(pipe_fd[1], STDOUT_FILENO) == -1)
         {
