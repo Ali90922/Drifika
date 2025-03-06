@@ -518,12 +518,14 @@ void LaunchSinglePipe(char *line)
         printf("  right_tokens[%d]: '%s'\n", i, right_tokens[i]);
 
     int pipe_fd[2];
+    printf("Check 1\n");
     if (pipe(pipe_fd) == -1)
     {
         perror("pipe");
         printf("Pipes not allocated\n");
         return;
     }
+    printf("Check 2\n");
 
     // Pipes are llocated
     pipeline_mode = 1;
