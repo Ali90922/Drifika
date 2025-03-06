@@ -558,6 +558,10 @@ void LaunchSinglePipe(char *line)
             perror("dup2 failed");
             exit(1);
         }
+
+        // fd[0] The read end of the pipe
+        // fd[1] The write end of the pipe
+
         printf("Check 6\n");
         printf("[DEBUG] STDOUT now set to pipe_fd[1]: %d\n", pipe_fd[1]);
 
