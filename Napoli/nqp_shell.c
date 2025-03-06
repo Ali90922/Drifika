@@ -530,10 +530,14 @@ void LaunchSinglePipe(char *line)
     // Pipes are llocated
     pipeline_mode = 1;
 
+    printf("Check 3\n");
+
     /* Fork for left command */
     pid_t pid1 = fork();
+    printf("Check 4\n");
     if (pid1 == 0)
     {
+        printf("Check 5\n");
         if (input_file != NULL) // Only oges into this sub- condition if th einput redirection is on -- For now Let's test it with this being off
         {
             int in_fd = setup_input_redirection(input_file);
