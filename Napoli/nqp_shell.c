@@ -470,18 +470,18 @@ void LaunchSinglePipe(char *line)
                 fprintf(stderr, "Syntax error: no input file specified\n");
                 return;
             }
-            input_file = token;
+            input_file = strdup(token); // duplicate input file string
         }
         else
         {
-            left_tokens[left_argc++] = token;
+            left_tokens[left_argc++] = strdup(token); // duplicate token string
         }
         token = strtok_r(NULL, " ", &saveptr_left);
     }
     left_tokens[left_argc] = NULL;
 
     printf("Left tokens:\n");
-    for (int i = 0; left_tokens[i] != NULL; i++)
+    for (int i = 0; i < left_argc; i++)
         printf("  left_tokens[%d]: '%s'\n", i, left_tokens[i]);
     if (input_file != NULL)
         printf("Input file: '%s'\n", input_file);
@@ -493,13 +493,13 @@ void LaunchSinglePipe(char *line)
     token = strtok_r(right_str, " ", &saveptr_right);
     while (token != NULL && right_argc < MAX_ARGS - 1)
     {
-        right_tokens[right_argc++] = token;
+        right_tokens[right_argc++] = strdup(token); // duplicate token string
         token = strtok_r(NULL, " ", &saveptr_right);
     }
     right_tokens[right_argc] = NULL;
 
     printf("Right tokens:\n");
-    for (int i = 0; right_tokens[i] != NULL; i++)
+    for (int i = 0; i < right_argc; i++)
         printf("  right_tokens[%d]: '%s'\n", i, right_tokens[i]);
 
     int pipe_fd[2];
