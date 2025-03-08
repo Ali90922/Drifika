@@ -356,6 +356,8 @@ void LaunchFunction(char **cmd_argv, char *input_file)
 
 int main(int argc, char *argv[], char *envp[])
 {
+    (void)envp;
+
     if (argc != 2)
     {
         fprintf(stderr, "Usage: %s volume.img\n", argv[0]);
