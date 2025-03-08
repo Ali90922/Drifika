@@ -22,17 +22,22 @@
 /* Global current working directory */
 char cwd[MAX_LINE_SIZE] = "/";
 
+/* Global flag: set to 1 when executing a pipeline */
+int pipeline_mode = 0;
+
 /* We'll need this to inherit the parent's environment for execve. */
 extern char **environ;
 
+/* Function declarations */
 void handle_cd(char *dir);
 void handle_pwd(void);
 void handle_ls(void);
-void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override, int do_fork);
+void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override);
 void LaunchSinglePipe(char *line);
 int setup_input_redirection(const char *filename);
 void fix_file_args(char **cmd_argv);
 
+/* fix_file_args implementation unchanged... */
 void fix_file_args(char **cmd_argv)
 {
     for (int i = 1; cmd_argv[i] != NULL; i++)
@@ -78,6 +83,7 @@ void fix_file_args(char **cmd_argv)
     }
 }
 
+/* setup_input_redirection implementation unchanged... */
 int setup_input_redirection(const char *filename)
 {
     char input_abs[MAX_LINE_SIZE];
@@ -132,14 +138,16 @@ int setup_input_redirection(const char *filename)
     return memfd_in;
 }
 
+/* handle_pwd: Print the current working directory */
 void handle_pwd(void)
 {
     printf("%s\n", cwd);
 }
 
+/* handle_cd: Change directory; supports "cd .." */
 void handle_cd(char *dir)
 {
-    if (!dir)
+    if (dir == NULL)
     {
         fprintf(stderr, "cd: missing argument\n");
         return;
@@ -173,6 +181,7 @@ void handle_cd(char *dir)
         fprintf(stderr, "Directory %s not found\n", path_copy);
 }
 
+/* handle_ls: List the contents of the current directory */
 void handle_ls(void)
 {
     nqp_dirent entry = {0};
@@ -199,72 +208,58 @@ void handle_ls(void)
     }
 }
 
-/*
- * LaunchFunction: Runs the given command.
- *  - If do_fork == 1 (normal single command), we fork here.
- *  - If do_fork == 0 (already in pipeline child), we just exec in this process.
- */
-void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override, int do_fork)
+/* LaunchFunction: Execute a single command (with or without a pipe). */
+void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
 {
+    int exec_fd = 0;
     char abs_path[MAX_LINE_SIZE];
+
     if (strcmp(cwd, "/") == 0)
         snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[0]);
     else
         snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[0]);
 
-    // If the command name starts with "._", skip that
+    /* Special-case: if the command name starts with "._", skip the "._" */
     if (strncmp(cmd_argv[0], "._", 2) == 0)
         cmd_argv[0] += 2;
 
-    // This is the "virtual FD" from NQP
-    int nqp_fd = nqp_open(abs_path);
-    if (nqp_fd == NQP_FILE_NOT_FOUND)
+    exec_fd = nqp_open(abs_path);
+    if (exec_fd == NQP_FILE_NOT_FOUND)
     {
         fprintf(stderr, "Command %s not found\n", abs_path);
         return;
     }
-    // Just print it out so we know it's not an OS FD:
-    printf("NQP FD for command (%s) is: %d\n", abs_path, nqp_fd);
+    printf("File Descriptor for command (%s) is : %d\n", abs_path, exec_fd);
 
-    // Create an in-memory file to copy the command
     int InMemoryFile = memfd_create("In-Memory-File", MFD_CLOEXEC);
-    printf("OS memfd for in-memory file is: %d\n", InMemoryFile);
+    printf("File Descriptor for In Memory File is  : %d\n", InMemoryFile);
     if (InMemoryFile == -1)
     {
         perror("memfd_create");
         return;
     }
 
-    // Copy the contents from the NQP FD into our OS memfd
     ssize_t bytes_read, bytes_written;
     char buffer[BUFFER_SIZE];
-    while ((bytes_read = nqp_read(nqp_fd, buffer, BUFFER_SIZE)) > 0)
+    while ((bytes_read = nqp_read(exec_fd, buffer, BUFFER_SIZE)) > 0)
     {
         bytes_written = write(InMemoryFile, buffer, bytes_read);
         if (bytes_written != bytes_read)
         {
             fprintf(stderr, "Error writing to in-memory file\n");
-            nqp_close(nqp_fd);
             return;
         }
     }
     if (bytes_read < 0)
     {
-        fprintf(stderr, "Error reading from NQP FD\n");
-        nqp_close(nqp_fd);
+        fprintf(stderr, "Error reading the source file\n");
         return;
     }
-    // We are done reading from the NQP FD
-    nqp_close(nqp_fd);
-
-    // Make the OS memfd executable
     if (fchmod(InMemoryFile, 0755) == -1)
     {
         perror("fchmod");
         return;
     }
-
-    // Debugging: read the first 16 bytes
     if (lseek(InMemoryFile, 0, SEEK_SET) == -1)
     {
         perror("lseek before header debug");
@@ -272,41 +267,71 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override, in
     }
     unsigned char debug_header[16];
     bytes_read = read(InMemoryFile, debug_header, sizeof(debug_header));
-    if (bytes_read != (ssize_t)sizeof(debug_header))
+    if (bytes_read != sizeof(debug_header))
     {
         perror("read header");
         return;
     }
     printf("In-memory file header: ");
-    for (int i = 0; i < 16; i++)
+    for (size_t i = 0; i < sizeof(debug_header); i++)
         printf("%02x ", debug_header[i]);
     printf("\n");
-
-    // Seek back to start to prepare for exec
+    fflush(stdout);
     if (lseek(InMemoryFile, 0, SEEK_SET) == -1)
     {
         perror("lseek after header debug");
         return;
     }
 
-    // For normal commands, fix file args unless it's head/tail in a pipeline
-    if (strcmp(cmd_argv[0], "head") != 0 && strcmp(cmd_argv[0], "tail") != 0)
-    {
+    /* If not in pipeline for head/tail, fix file args: */
+    if (!(pipeline_mode && (strcmp(cmd_argv[0], "head") == 0 || strcmp(cmd_argv[0], "tail") == 0)))
         fix_file_args(cmd_argv);
-    }
 
-    // Decide whether we do a fork or not
-    if (do_fork)
+    /* If it's a shell script (#!), copy to a temp file and execve that. */
+    if (debug_header[0] == '#' && debug_header[1] == '!')
     {
+        printf("Detected shell script, using temporary file workaround\n");
+        fflush(stdout);
+        char tmp_template[] = "/tmp/scriptXXXXXX";
+        int tmp_fd = mkstemp(tmp_template);
+        if (tmp_fd == -1)
+        {
+            perror("mkstemp");
+            exit(1);
+        }
+        if (lseek(InMemoryFile, 0, SEEK_SET) == -1)
+        {
+            perror("lseek before copying to tmp");
+            exit(1);
+        }
+        while ((bytes_read = read(InMemoryFile, buffer, BUFFER_SIZE)) > 0)
+        {
+            if (write(tmp_fd, buffer, bytes_read) != bytes_read)
+            {
+                perror("write to tmp file");
+                exit(1);
+            }
+        }
+        if (bytes_read < 0)
+        {
+            perror("read from in-memory file");
+            exit(1);
+        }
+        if (fchmod(tmp_fd, 0755) == -1)
+        {
+            perror("fchmod tmp file");
+            exit(1);
+        }
+        close(tmp_fd);
         pid_t pid = fork();
-        if (pid < 0)
+        if (pid == -1)
         {
             perror("fork");
-            return;
+            exit(1);
         }
         if (pid == 0)
         {
-            // CHILD
+            /* Child: Setup input redirection if needed */
             if (input_file != NULL || input_fd_override != -1)
             {
                 int input_fd;
@@ -314,7 +339,7 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override, in
                 {
                     input_fd = setup_input_redirection(input_file);
                     if (input_fd == -1)
-                        _exit(1);
+                        exit(1);
                 }
                 else
                 {
@@ -323,166 +348,76 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override, in
                 if (dup2(input_fd, STDIN_FILENO) == -1)
                 {
                     perror("dup2 for input");
-                    _exit(1);
+                    exit(1);
                 }
                 close(input_fd);
             }
-
-            // Check if file is a shell script
-            if (debug_header[0] == '#' && debug_header[1] == '!')
+            /* Switch working directory to 'cwd'. */
+            if (chdir(cwd) == -1)
             {
-                printf("Detected shell script, using temporary file workaround\n");
-                char tmp_template[] = "/tmp/scriptXXXXXX";
-                int tmp_fd = mkstemp(tmp_template);
-                if (tmp_fd == -1)
-                {
-                    perror("mkstemp");
-                    _exit(1);
-                }
-                // Copy from memfd to tmp_fd
-                if (lseek(InMemoryFile, 0, SEEK_SET) == -1)
-                {
-                    perror("lseek before copying to tmp");
-                    _exit(1);
-                }
-                while ((bytes_read = read(InMemoryFile, buffer, BUFFER_SIZE)) > 0)
-                {
-                    if (write(tmp_fd, buffer, bytes_read) != bytes_read)
-                    {
-                        perror("write to tmp file");
-                        _exit(1);
-                    }
-                }
-                if (bytes_read < 0)
-                {
-                    perror("read from in-memory file");
-                    _exit(1);
-                }
-                if (fchmod(tmp_fd, 0755) == -1)
-                {
-                    perror("fchmod tmp file");
-                    _exit(1);
-                }
-                close(tmp_fd);
-
-                // switch to 'cwd'
-                if (chdir(cwd) == -1)
-                {
-                    perror("chdir");
-                    _exit(1);
-                }
-
-                execve(tmp_template, cmd_argv, environ);
-                perror("execve shell script");
-                _exit(1);
+                perror("chdir");
+                exit(1);
             }
-            else
+            /* Use parent's environment so script can find commands in PATH. */
+            if (execve(tmp_template, cmd_argv, environ) == -1)
             {
-                // It's probably ELF => fexecve
-                if (chdir(cwd) == -1)
-                {
-                    perror("chdir");
-                    _exit(1);
-                }
-                if (fexecve(InMemoryFile, cmd_argv, environ) == -1)
-                {
-                    perror("fexecve ELF");
-                    _exit(1);
-                }
+                perror("execve");
+                exit(1);
             }
         }
         else
         {
-            // PARENT
-            waitpid(pid, NULL, 0);
+            int status;
+            waitpid(pid, &status, 0);
         }
     }
     else
     {
-        // do_fork = 0 => already in pipeline child, just exec right here
-        if (input_file != NULL || input_fd_override != -1)
+        /* It's an ELF or other binary, do fexecve() in a child process. */
+        pid_t pid = fork();
+        if (pid == -1)
         {
-            int input_fd;
-            if (input_file != NULL)
-            {
-                input_fd = setup_input_redirection(input_file);
-                if (input_fd == -1)
-                    _exit(1);
-            }
-            else
-            {
-                input_fd = input_fd_override;
-            }
-            if (dup2(input_fd, STDIN_FILENO) == -1)
-            {
-                perror("dup2 for input");
-                _exit(1);
-            }
-            close(input_fd);
+            perror("fork");
+            return;
         }
-
-        // Check shell script
-        if (debug_header[0] == '#' && debug_header[1] == '!')
+        if (pid == 0)
         {
-            printf("Detected shell script (pipeline child), using tmp file\n");
-            char tmp_template[] = "/tmp/scriptXXXXXX";
-            int tmp_fd = mkstemp(tmp_template);
-            if (tmp_fd == -1)
+            if (input_file != NULL || input_fd_override != -1)
             {
-                perror("mkstemp");
-                _exit(1);
-            }
-            if (lseek(InMemoryFile, 0, SEEK_SET) == -1)
-            {
-                perror("lseek before copy");
-                _exit(1);
-            }
-            while ((bytes_read = read(InMemoryFile, buffer, BUFFER_SIZE)) > 0)
-            {
-                if (write(tmp_fd, buffer, bytes_read) != bytes_read)
+                int input_fd;
+                if (input_file != NULL)
                 {
-                    perror("write to tmp file");
-                    _exit(1);
+                    input_fd = setup_input_redirection(input_file);
+                    if (input_fd == -1)
+                        exit(1);
                 }
+                else
+                {
+                    input_fd = input_fd_override;
+                }
+                if (dup2(input_fd, STDIN_FILENO) == -1)
+                {
+                    perror("dup2 for input");
+                    exit(1);
+                }
+                close(input_fd);
             }
-            if (bytes_read < 0)
+            /* Use parent's environment for fexecve as well. */
+            if (fexecve(InMemoryFile, cmd_argv, environ) == -1)
             {
-                perror("read from in-memory file");
-                _exit(1);
+                perror("fexecve");
+                exit(1);
             }
-            if (fchmod(tmp_fd, 0755) == -1)
-            {
-                perror("fchmod tmp file");
-                _exit(1);
-            }
-            close(tmp_fd);
-
-            if (chdir(cwd) == -1)
-            {
-                perror("chdir");
-                _exit(1);
-            }
-            execve(tmp_template, cmd_argv, environ);
-            perror("execve shell script");
-            _exit(1);
         }
         else
         {
-            // fexecve
-            if (chdir(cwd) == -1)
-            {
-                perror("chdir");
-                _exit(1);
-            }
-            if (fexecve(InMemoryFile, cmd_argv, environ) == -1)
-            {
-                perror("fexecve ELF");
-                _exit(1);
-            }
+            int status;
+            waitpid(pid, &status, 0);
         }
     }
 }
 
+/* LaunchSinglePipe: one-pipe command logic unchanged except the fix. */
 void LaunchSinglePipe(char *line)
 {
     char *saveptr;
@@ -544,34 +479,39 @@ void LaunchSinglePipe(char *line)
         return;
     }
     printf("Check 2\n");
+
+    pipeline_mode = 1;
+
     printf("Check 3\n");
 
+    /* Fork for left side */
     pid_t pid1 = fork();
+
     if (pid1 == 0)
     {
-        printf("Check 44444 (left child)\n");
-        // connect write-end to STDOUT
+        printf("Check 44444\n");
         dup2(pipe_fd[1], STDOUT_FILENO);
         close(pipe_fd[0]);
         close(pipe_fd[1]);
-
-        // run left side in THIS child
-        LaunchFunction(left_tokens, input_file, -1, /*do_fork=*/0);
-        _exit(1);
+        LaunchFunction(left_tokens, input_file, -1);
+        exit(0);
     }
 
+    /* Fork for right side */
     pid_t pid2 = fork();
     if (pid2 == 0)
     {
-        printf("Inside Child Process No 2 (right side)! \n");
-        // connect read-end to STDIN
+        printf("Inside Child Process No 2 (Head Process)! \n");
+        // Redirect STDIN to the read end of the pipe:
         dup2(pipe_fd[0], STDIN_FILENO);
         close(pipe_fd[0]);
         close(pipe_fd[1]);
 
-        LaunchFunction(right_tokens, NULL, -1, /*do_fork=*/0);
-        _exit(1);
+        LaunchFunction(right_tokens, NULL, -1);
+
+        exit(0);
     }
+
     close(pipe_fd[0]);
     close(pipe_fd[1]);
 
@@ -579,17 +519,24 @@ void LaunchSinglePipe(char *line)
     printf("Checker 99 \n");
     waitpid(pid2, NULL, 0);
     printf("Checker 999 \n");
+    pipeline_mode = 0;
 }
 
+/* main_pipe: Main loop for our one-pipe shell using readline */
 int main_pipe(int argc, char *argv[], char *envp[])
 {
-    (void)envp;
+    char *line = NULL;
+    char *tokens[MAX_ARGS];
+    nqp_error mount_error;
+    (void)envp; // Unused
+
     if (argc != 2)
     {
         fprintf(stderr, "Usage: ./nqp_shell volume.img\n");
         exit(EXIT_FAILURE);
     }
-    nqp_error mount_error = nqp_mount(argv[1], NQP_FS_EXFAT);
+
+    mount_error = nqp_mount(argv[1], NQP_FS_EXFAT);
     if (mount_error != NQP_OK)
     {
         if (mount_error == NQP_FSCK_FAIL)
@@ -597,41 +544,39 @@ int main_pipe(int argc, char *argv[], char *envp[])
         exit(EXIT_FAILURE);
     }
 
-    char *line = NULL;
     while (1)
     {
         char prompt[MAX_LINE_SIZE];
         snprintf(prompt, sizeof(prompt), "%s:\\> ", cwd);
         line = readline(prompt);
-        if (!line)
+        if (line == NULL)
         {
             printf("\nExiting shell...\n");
             break;
         }
         if (strlen(line) > 0)
             add_history(line);
-
         if (strlen(line) == 0)
         {
             free(line);
             continue;
         }
 
-        if (strchr(line, '|'))
+        /* Pipeline detection */
+        if (strchr(line, '|') != NULL)
         {
             LaunchSinglePipe(line);
             free(line);
             continue;
         }
 
-        /* single command logic */
-        char *tokens[MAX_ARGS];
+        /* Tokenize the input line */
         int token_count = 0;
-        char *tok = strtok(line, " ");
-        while (tok && token_count < MAX_ARGS - 1)
+        char *token = strtok(line, " ");
+        while (token != NULL && token_count < MAX_ARGS - 1)
         {
-            tokens[token_count++] = tok;
-            tok = strtok(NULL, " ");
+            tokens[token_count++] = token;
+            token = strtok(NULL, " ");
         }
         tokens[token_count] = NULL;
         if (token_count == 0)
@@ -640,7 +585,7 @@ int main_pipe(int argc, char *argv[], char *envp[])
             continue;
         }
 
-        /* Built-ins */
+        /* Built-in commands */
         if (strcmp(tokens[0], "exit") == 0)
         {
             printf("Exiting shell...\n");
@@ -666,7 +611,7 @@ int main_pipe(int argc, char *argv[], char *envp[])
             continue;
         }
 
-        /* possibly parse "< file" */
+        /* Parse any "< file" redirection from tokens */
         char *cmd_argv[MAX_ARGS];
         int cmd_argc = 0;
         char *input_file = NULL;
@@ -698,8 +643,8 @@ int main_pipe(int argc, char *argv[], char *envp[])
             continue;
         }
 
-        /* Launch a single command in a fork */
-        LaunchFunction(cmd_argv, input_file, -1, /*do_fork=*/1);
+        /* Run the single command */
+        LaunchFunction(cmd_argv, input_file, -1);
         free(line);
     }
     return EXIT_SUCCESS;
