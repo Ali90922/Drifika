@@ -548,6 +548,11 @@ void LaunchSinglePipe(char *line)
 
             printf("Checker 95 \n");
         }
+        printf("Filtered right tokens:\n");
+        for (int i = 0; right_tokens[i] != NULL; i++)
+        {
+            printf("  right_tokens[%d]: '%s'\n", i, right_tokens[i]);
+        }
 
         LaunchFunction(right_tokens, NULL, pipe_read_dup);
         printf("Checker 96 \n");
