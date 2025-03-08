@@ -6,7 +6,8 @@
 # to copy and use this Makefile for their own work.
 
 CC = clang
-CFLAGS = -Wall -Werror -Wextra -Wpedantic -g -D_FORTIFY_SOURCE=3
+clang -Wall -Werror -Wextra -Wpedantic -g -D_FORTIFY_SOURCE=3 nqp_shell.c nqp_exfat.o -o nqp_shell -lreadline
+
 
 # if you want to run this on macOS under Lima, you should run
 # make NQP_EXFAT=nqp_exfat_arm.o
