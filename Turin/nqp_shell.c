@@ -211,20 +211,42 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
     int exec_fd = 0;
     char abs_path[MAX_LINE_SIZE];
 
-    if (strcmp(cwd, "/") == 0)
-        snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[0]);
+    /* Construct absolute path: if command doesn't start with '/', use cwd.
+       If cwd is "/" then ensure the command gets a leading '/' */
+    if (cmd_argv[0][0] != '/')
+    {
+        if (strcmp(cwd, "/") == 0)
+            snprintf(abs_path, sizeof(abs_path), "/%s", cmd_argv[0]);
+        else
+            snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[0]);
+    }
     else
-        snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[0]);
+    {
+        strncpy(abs_path, cmd_argv[0], sizeof(abs_path));
+    }
 
     /* Special-case: if the command name starts with "._", skip the "._" */
     if (strncmp(cmd_argv[0], "._", 2) == 0)
         cmd_argv[0] += 2;
 
+    /* Try opening the command */
     exec_fd = nqp_open(abs_path);
     if (exec_fd == NQP_FILE_NOT_FOUND)
     {
-        fprintf(stderr, "Command %s not found\n", abs_path);
-        return;
+        /* If not found, try looking in /bin */
+        char bin_path[MAX_LINE_SIZE];
+        snprintf(bin_path, sizeof(bin_path), "/bin/%s", cmd_argv[0]);
+        exec_fd = nqp_open(bin_path);
+        if (exec_fd == NQP_FILE_NOT_FOUND)
+        {
+            fprintf(stderr, "Command %s not found\n", cmd_argv[0]);
+            return;
+        }
+        else
+        {
+            /* Use the /bin version */
+            strncpy(abs_path, bin_path, sizeof(abs_path));
+        }
     }
     printf("File Descriptor for command (%s) is : %d\n", abs_path, exec_fd);
 
