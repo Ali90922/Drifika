@@ -505,27 +505,6 @@ void LaunchSinglePipe(char *line)
     {
         printf("Check 44444\n");
         LaunchFunction(left_tokens, input_file, -1);
-        printf("Inside Child Process No 1 \n");
-
-        printf("Check 11\n");
-
-        dup2(pipe_fd[1], STDOUT_FILENO);
-
-        printf("Check 6\n");
-        printf("[DEBUG] STDOUT now set to pipe_fd[1]: %d\n", pipe_fd[1]);
-
-        close(pipe_fd[0]);
-
-        printf("Check 7\n");
-        printf("[DEBUG] Closed pipe_fd[0]\n");
-
-        close(pipe_fd[1]);
-
-        printf("[DEBUG] Closed pipe_fd[1]\n");
-
-        printf("[DEBUG] Executing left command...\n");
-        LaunchFunction(left_tokens, input_file, -1);
-        exit(0);
     }
 
     pid_t pid2 = fork();
@@ -533,17 +512,11 @@ void LaunchSinglePipe(char *line)
     {
         printf("Inside Child Process No 2 (Head Process)! \n");
 
-        dup2(pipe_fd[0], STDIN_FILENO);
-        close(pipe_fd[0]);
-        close(pipe_fd[1]);
-
-        LaunchFunction(right_tokens, NULL, -1);
-        printf("Checker 96 \n");
         exit(0);
     }
 
-    close(pipe_fd[0]);
-    close(pipe_fd[1]);
+    // close(pipe_fd[0]);
+    // close(pipe_fd[1]);
 
     waitpid(pid1, NULL, 0);
     printf("Checker 99 \n");
@@ -674,3 +647,41 @@ int main(int argc, char *argv[], char *envp[])
 {
     return main_pipe(argc, argv, envp);
 }
+
+/*         printf("Inside Child Process No 1 \n");
+
+        printf("Check 11\n");
+
+        dup2(pipe_fd[1], STDOUT_FILENO);
+
+        printf("Check 6\n");
+        printf("[DEBUG] STDOUT now set to pipe_fd[1]: %d\n", pipe_fd[1]);
+
+        close(pipe_fd[0]);
+
+        printf("Check 7\n");
+        printf("[DEBUG] Closed pipe_fd[0]\n");
+
+        close(pipe_fd[1]);
+
+        printf("[DEBUG] Closed pipe_fd[1]\n");
+
+        printf("[DEBUG] Executing left command...\n");
+        LaunchFunction(left_tokens, input_file, -1);
+        exit(0);
+
+
+
+
+
+
+
+
+
+        dup2(pipe_fd[0], STDIN_FILENO);
+        close(pipe_fd[0]);
+        close(pipe_fd[1]);
+
+        LaunchFunction(right_tokens, NULL, -1);
+        printf("Checker 96 \n");
+*/
