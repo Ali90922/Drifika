@@ -505,6 +505,10 @@ void LaunchSinglePipe(char *line)
     {
         printf("Check 44444\n");
         LaunchFunction(left_tokens, input_file, -1);
+        dup2(pipe_fd[1], STDOUT_FILENO);
+        close(pipe_fd[0]);
+        close(pipe_fd[1]);
+        LaunchFunction(left_tokens, input_file, -1);
     }
 
     pid_t pid2 = fork();
