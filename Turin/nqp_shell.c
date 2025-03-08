@@ -510,19 +510,13 @@ void LaunchSinglePipe(char *line)
         printf("Check 6\n");
         printf("[DEBUG] STDOUT now set to pipe_fd[1]: %d\n", pipe_fd[1]);
 
-        if (close(pipe_fd[0]) == -1)
-        {
-            perror("close pipe_fd[0] failed");
-            exit(1);
-        }
+        close(pipe_fd[0]);
+
         printf("Check 7\n");
         printf("[DEBUG] Closed pipe_fd[0]\n");
 
-        if (close(pipe_fd[1]) == -1)
-        {
-            perror("close pipe_fd[1] failed");
-            exit(1);
-        }
+        close(pipe_fd[1]);
+
         printf("[DEBUG] Closed pipe_fd[1]\n");
 
         printf("[DEBUG] Executing left command...\n");
