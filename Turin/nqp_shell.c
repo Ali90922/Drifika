@@ -55,24 +55,27 @@ void fix_file_args(char **cmd_argv)
             strncpy(abs_path, cmd_argv[i], sizeof(abs_path));
         }
 
-        // FIX #2: nqp_open -> duplicate FD >= 3
         int raw_fd = nqp_open(abs_path);
         if (raw_fd != NQP_FILE_NOT_FOUND)
         {
+            // Duplicate descriptor to fd >= 3, but do NOT close raw_fd!
             int fd = fcntl(raw_fd, F_DUPFD, 3);
-            nqp_close(raw_fd);
             if (fd == -1)
             {
                 perror("fcntl(F_DUPFD) in fix_file_args");
+                // if you want, you can call nqp_close(raw_fd) here since
+                // we failed to duplicate. But let's just keep going.
                 continue;
             }
 
+            // Now read the file from 'fd'
             char tmp_template[] = "/tmp/volfileXXXXXX";
             int tmp_fd = mkstemp(tmp_template);
             if (tmp_fd == -1)
             {
                 perror("mkstemp for file argument");
-                close(fd);
+                // optional: nqp_close(raw_fd);
+                // optional: nqp_close(fd);
                 continue;
             }
             ssize_t r, w;
@@ -87,7 +90,9 @@ void fix_file_args(char **cmd_argv)
                 }
             }
             close(tmp_fd);
-            nqp_close(fd);
+            // optional: nqp_close(fd);
+
+            // Replace the arg with the path to the temp file
             cmd_argv[i] = strdup(tmp_template);
         }
     }
@@ -109,15 +114,14 @@ int setup_input_redirection(const char *filename)
         strncpy(input_abs, filename, sizeof(input_abs));
     }
 
-    // FIX #2: nqp_open -> duplicate FD >= 3
     int raw_fd = nqp_open(input_abs);
     if (raw_fd == NQP_FILE_NOT_FOUND)
     {
         fprintf(stderr, "Input file %s not found\n", input_abs);
         return -1;
     }
+    // Duplicate to fd >= 3, do NOT close raw_fd
     int fd = fcntl(raw_fd, F_DUPFD, 3);
-    nqp_close(raw_fd);
     if (fd == -1)
     {
         perror("fcntl(F_DUPFD) for input");
@@ -139,7 +143,6 @@ int setup_input_redirection(const char *filename)
         {
             fprintf(stderr, "Error writing input file to memory file\n");
             close(memfd_in);
-            nqp_close(fd);
             return -1;
         }
     }
@@ -147,10 +150,8 @@ int setup_input_redirection(const char *filename)
     {
         fprintf(stderr, "Error reading input file %s\n", input_abs);
         close(memfd_in);
-        nqp_close(fd);
         return -1;
     }
-    nqp_close(fd);
 
     if (lseek(memfd_in, 0, SEEK_SET) == -1)
     {
@@ -199,7 +200,6 @@ void handle_cd(char *dir)
         strncpy(path_copy, dir, sizeof(path_copy));
     }
 
-    // Just check existence
     int raw_fd = nqp_open(path_copy);
     if (raw_fd == NQP_FILE_NOT_FOUND)
     {
@@ -207,7 +207,8 @@ void handle_cd(char *dir)
     }
     else
     {
-        // We only needed to check existence; close it
+        // not calling nqp_close(raw_fd) immediately could also cause leaks,
+        // but we only needed to check existence. Just do it if you want:
         nqp_close(raw_fd);
         strcpy(cwd, path_copy);
     }
@@ -219,21 +220,22 @@ void handle_ls(void)
     nqp_dirent entry = {0};
     ssize_t dirents_read;
 
-    // FIX #2: nqp_open -> duplicate FD >= 3
     int raw_fd = nqp_open(cwd);
     if (raw_fd == NQP_FILE_NOT_FOUND)
     {
         fprintf(stderr, "%s not found\n", cwd);
         return;
     }
+
+    // Duplicate to fd >= 3, but do NOT close raw_fd
     int fd = fcntl(raw_fd, F_DUPFD, 3);
-    nqp_close(raw_fd);
     if (fd == -1)
     {
         perror("fcntl(F_DUPFD) in handle_ls");
         return;
     }
 
+    // read directory entries from 'fd'
     while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
     {
         printf("%lu %s", entry.inode_number, entry.name);
@@ -245,13 +247,12 @@ void handle_ls(void)
     if (dirents_read == -1)
         fprintf(stderr, "%s is not a directory\n", cwd);
 
-    nqp_close(fd);
+    // optional: nqp_close(fd); // you can if you won't read from it again
 }
 
 /* LaunchFunction: Execute a single command (with or without a pipe). */
 void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
 {
-    int InMemoryFile = 0;
     char abs_path[MAX_LINE_SIZE];
 
     if (strcmp(cwd, "/") == 0)
@@ -263,29 +264,26 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
     if (strncmp(cmd_argv[0], "._", 2) == 0)
         cmd_argv[0] += 2;
 
-    // FIX #2: nqp_open -> duplicate FD >= 3
     int raw_fd = nqp_open(abs_path);
     if (raw_fd == NQP_FILE_NOT_FOUND)
     {
         fprintf(stderr, "Command %s not found\n", abs_path);
         return;
     }
+    // Duplicate to fd >= 3, do NOT close raw_fd
     int exec_fd = fcntl(raw_fd, F_DUPFD, 3);
-    nqp_close(raw_fd);
     if (exec_fd == -1)
     {
         perror("fcntl(F_DUPFD) for command file");
         return;
     }
-
     printf("File Descriptor for command (%s) is : %d\n", abs_path, exec_fd);
 
-    InMemoryFile = memfd_create("In-Memory-File", MFD_CLOEXEC);
+    int InMemoryFile = memfd_create("In-Memory-File", MFD_CLOEXEC);
     printf("File Descriptor for In Memory File is  : %d\n", InMemoryFile);
     if (InMemoryFile == -1)
     {
         perror("memfd_create");
-        nqp_close(exec_fd);
         return;
     }
 
@@ -297,17 +295,16 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         if (bytes_written != bytes_read)
         {
             fprintf(stderr, "Error writing to in-memory file\n");
-            nqp_close(exec_fd);
             return;
         }
     }
     if (bytes_read < 0)
     {
         fprintf(stderr, "Error reading the source file\n");
-        nqp_close(exec_fd);
         return;
     }
-    nqp_close(exec_fd);
+
+    // optional: nqp_close(exec_fd); // see note about not closing if nqp_exfat doesn't do refcount
 
     if (fchmod(InMemoryFile, 0755) == -1)
     {
@@ -343,18 +340,17 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
     if (!(pipeline_mode && (strcmp(cmd_argv[0], "head") == 0 || strcmp(cmd_argv[0], "tail") == 0)))
         fix_file_args(cmd_argv);
 
-    /* Child process to execute the in-memory file. */
+    /* Fork a child to run the loaded command. */
     pid_t pid = fork();
     if (pid == -1)
     {
         perror("fork");
         return;
     }
-
     if (pid == 0)
     {
-        /* Child */
-        /* Setup input redirection if needed */
+        // Child
+        // Setup input redirection if needed
         if (input_file != NULL || input_fd_override != -1)
         {
             int the_input_fd;
@@ -375,18 +371,19 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
             }
             close(the_input_fd);
         }
-        /* Switch working directory to 'cwd'. */
+        // Switch working directory
         if (chdir(cwd) == -1)
         {
             perror("chdir");
             exit(1);
         }
 
-        /* If it's a #! script, we must copy to a tmp file and execve that. */
+        // If #! script, copy to a tmp file and execve
         if (debug_header[0] == '#' && debug_header[1] == '!')
         {
             printf("Detected shell script, using temporary file workaround\n");
             fflush(stdout);
+
             char tmp_template[] = "/tmp/scriptXXXXXX";
             int tmp_fd = mkstemp(tmp_template);
             if (tmp_fd == -1)
@@ -428,7 +425,7 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         }
         else
         {
-            /* It's an ELF or other binary, do fexecve() directly. */
+            // ELF or other binary: do fexecve
             if (fexecve(InMemoryFile, cmd_argv, environ) == -1)
             {
                 perror("fexecve");
@@ -438,6 +435,7 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
     }
     else
     {
+        // Parent
         int status;
         waitpid(pid, &status, 0);
     }
@@ -523,7 +521,6 @@ void LaunchSinglePipe(char *line)
     printf("Check 2\n");
 
     pipeline_mode = 1;
-
     printf("Check 3\n");
 
     /* Fork for left side */
@@ -558,18 +555,17 @@ void LaunchSinglePipe(char *line)
         dup2(pipe_fd[0], STDIN_FILENO);
         close(pipe_fd[0]);
         close(pipe_fd[1]);
-
         LaunchFunction(right_tokens, NULL, -1);
         exit(0);
     }
 
     close(pipe_fd[0]);
     close(pipe_fd[1]);
-
     waitpid(pid1, NULL, 0);
     printf("Checker 99 \n");
     waitpid(pid2, NULL, 0);
     printf("Checker 999 \n");
+
     pipeline_mode = 0;
 }
 
