@@ -274,18 +274,32 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         printf("%02x ", debug_header[i]);
     printf("\n");
     fflush(stdout);
+
     if (lseek(InMemoryFile, 0, SEEK_SET) == -1)
     {
         perror("lseek after header debug");
         return;
     }
+
+    /* For non-pipeline commands (or non-head/tail), fix file arguments */
     if (!(pipeline_mode && (strcmp(cmd_argv[0], "head") == 0 || strcmp(cmd_argv[0], "tail") == 0)))
         fix_file_args(cmd_argv);
 
-    if (debug_header[0] == '#' && debug_header[1] == '!')
+    /* Introduce a flag to force the temporary file workaround for head/tail in pipeline mode */
+    int force_temp_file = 0;
+    if (pipeline_mode && (strcmp(cmd_argv[0], "head") == 0 || strcmp(cmd_argv[0], "tail") == 0))
+        force_temp_file = 1;
+
+    /* If the in-memory file has a shell script header OR we are forcing the temporary file workaround,
+       use the temporary file approach */
+    if ((debug_header[0] == '#' && debug_header[1] == '!') || force_temp_file)
     {
-        printf("Detected shell script, using temporary file workaround\n");
+        if (debug_header[0] == '#' && debug_header[1] == '!')
+            printf("Detected shell script, using temporary file workaround\n");
+        else
+            printf("Forcing temporary file workaround for %s\n", cmd_argv[0]);
         fflush(stdout);
+
         char tmp_template[] = "/tmp/scriptXXXXXX";
         int tmp_fd = mkstemp(tmp_template);
         if (tmp_fd == -1)
