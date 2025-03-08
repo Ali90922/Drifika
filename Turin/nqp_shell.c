@@ -517,7 +517,7 @@ void LaunchSinglePipe(char *line)
         dup2(pipe_fd[0], STDIN_FILENO);
         close(pipe_fd[0]);
         close(pipe_fd[1]);
-        LaunchFunction(right_tokens, NULL, -1);
+        // LaunchFunction(right_tokens, NULL, -1);
 
         exit(0);
     }
