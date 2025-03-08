@@ -12,6 +12,8 @@
 #include "nqp_io.h"
 #include <sys/stat.h>
 #include <errno.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 #define BUFFER_SIZE 1024
 #define MAX_LINE_SIZE 256
@@ -27,17 +29,12 @@ int pipeline_mode = 0;
 void handle_cd(char *dir);
 void handle_pwd(void);
 void handle_ls(void);
-/* Updated LaunchFunction now accepts an override FD (-1 means no override) */
 void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override);
 void LaunchSinglePipe(char *line);
 int setup_input_redirection(const char *filename);
 void fix_file_args(char **cmd_argv);
 
-/*
- * fix_file_args:
- * For each argument (except cmd_argv[0] which is the command name), check if the file exists on the volume.
- * If it does, create a temporary file on the host with its contents and then replace the argument with the temporary file's path.
- */
+/* fix_file_args implementation unchanged... */
 void fix_file_args(char **cmd_argv)
 {
     for (int i = 1; cmd_argv[i] != NULL; i++)
@@ -83,11 +80,7 @@ void fix_file_args(char **cmd_argv)
     }
 }
 
-/*
- * setup_input_redirection:
- * Reads a file (given by filename) from the volume into a memory-backed file.
- * Returns a file descriptor for that memory file.
- */
+/* setup_input_redirection implementation unchanged... */
 int setup_input_redirection(const char *filename)
 {
     char input_abs[MAX_LINE_SIZE];
@@ -212,11 +205,7 @@ void handle_ls(void)
     }
 }
 
-/*
- * LaunchFunction: Execute a single command (with or without a pipe).
- * The new parameter "input_fd_override" lets us pass an alternate FD (e.g. the pipe's read end)
- * for input redirection. Pass -1 if not used.
- */
+/* LaunchFunction: Execute a single command (with or without a pipe). */
 void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
 {
     int exec_fd = 0;
@@ -290,11 +279,9 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         perror("lseek after header debug");
         return;
     }
-    /* In pipeline mode, if the command is head or tail, skip fixing file arguments */
     if (!(pipeline_mode && (strcmp(cmd_argv[0], "head") == 0 || strcmp(cmd_argv[0], "tail") == 0)))
         fix_file_args(cmd_argv);
 
-    /* If the file starts with "#!" it is considered a shell script */
     if (debug_header[0] == '#' && debug_header[1] == '!')
     {
         printf("Detected shell script, using temporary file workaround\n");
@@ -338,7 +325,6 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         }
         if (pid == 0)
         {
-            /* Unified input redirection block for shell script branch */
             if (input_file != NULL || input_fd_override != -1)
             {
                 int input_fd;
@@ -389,7 +375,6 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         }
         if (pid == 0)
         {
-            /* Unified input redirection block for binary branch */
             if (input_file != NULL || input_fd_override != -1)
             {
                 int input_fd;
@@ -427,11 +412,7 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
     }
 }
 
-/*
- * LaunchSinglePipe: Execute a pipeline with exactly two commands.
- * Expected format:
- *   "left_cmd [args ...] [< infile] | right_cmd [args ...]"
- */
+/* LaunchSinglePipe implementation unchanged... */
 void LaunchSinglePipe(char *line)
 {
     char *saveptr;
@@ -454,7 +435,6 @@ void LaunchSinglePipe(char *line)
         return;
     }
 
-    /* Tokenize left command */
     char *left_tokens[MAX_ARGS];
     int left_argc = 0;
     char *input_file = NULL;
@@ -470,11 +450,11 @@ void LaunchSinglePipe(char *line)
                 fprintf(stderr, "Syntax error: no input file specified\n");
                 return;
             }
-            input_file = strdup(token); // duplicate input file string
+            input_file = strdup(token);
         }
         else
         {
-            left_tokens[left_argc++] = strdup(token); // duplicate token string
+            left_tokens[left_argc++] = strdup(token);
         }
         token = strtok_r(NULL, " ", &saveptr_left);
     }
@@ -486,14 +466,13 @@ void LaunchSinglePipe(char *line)
     if (input_file != NULL)
         printf("Input file: '%s'\n", input_file);
 
-    /* Tokenize right command */
     char *right_tokens[MAX_ARGS];
     int right_argc = 0;
     char *saveptr_right;
     token = strtok_r(right_str, " ", &saveptr_right);
     while (token != NULL && right_argc < MAX_ARGS - 1)
     {
-        right_tokens[right_argc++] = strdup(token); // duplicate token string
+        right_tokens[right_argc++] = strdup(token);
         token = strtok_r(NULL, " ", &saveptr_right);
     }
     right_tokens[right_argc] = NULL;
@@ -516,7 +495,6 @@ void LaunchSinglePipe(char *line)
 
     printf("Check 3\n");
 
-    /* Fork for left command */
     pid_t pid1 = fork();
     printf("Check 4\n");
     if (pid1 == 0)
@@ -562,16 +540,13 @@ void LaunchSinglePipe(char *line)
         printf("[DEBUG] Closed pipe_fd[1]\n");
 
         printf("[DEBUG] Executing left command...\n");
-        /* Pass -1 as no override FD for left command */
         LaunchFunction(left_tokens, input_file, -1);
         exit(0);
     }
 
-    /* Fork for right command */
     pid_t pid2 = fork();
     if (pid2 == 0)
     {
-        /* For right command, duplicate the pipe's read end to avoid it occupying fd 0 */
         close(pipe_fd[1]);
         int pipe_read_dup = dup(pipe_fd[0]);
         close(pipe_fd[0]);
@@ -596,10 +571,10 @@ void LaunchSinglePipe(char *line)
     pipeline_mode = 0;
 }
 
-/* main_pipe: Main loop for our one-pipe shell */
+/* main_pipe: Main loop for our one-pipe shell using readline */
 int main_pipe(int argc, char *argv[], char *envp[])
 {
-    char line_buffer[MAX_LINE_SIZE] = {0};
+    char *line = NULL;
     char *tokens[MAX_ARGS];
     nqp_error mount_error;
     (void)envp; // Unused
@@ -620,22 +595,29 @@ int main_pipe(int argc, char *argv[], char *envp[])
 
     while (1)
     {
-        printf("%s:\\> ", cwd);
-        if (fgets(line_buffer, MAX_LINE_SIZE, stdin) == NULL)
+        char prompt[MAX_LINE_SIZE];
+        snprintf(prompt, sizeof(prompt), "%s:\\> ", cwd);
+        line = readline(prompt);
+        if (line == NULL)
         {
             printf("\nExiting shell...\n");
             break;
         }
-        line_buffer[strcspn(line_buffer, "\n")] = '\0';
-        if (strlen(line_buffer) == 0)
-            continue;
-        if (strchr(line_buffer, '|') != NULL)
+        if (strlen(line) > 0)
+            add_history(line);
+        if (strlen(line) == 0)
         {
-            LaunchSinglePipe(line_buffer);
+            free(line);
+            continue;
+        }
+        if (strchr(line, '|') != NULL)
+        {
+            LaunchSinglePipe(line);
+            free(line);
             continue;
         }
         int token_count = 0;
-        char *token = strtok(line_buffer, " ");
+        char *token = strtok(line, " ");
         while (token != NULL && token_count < MAX_ARGS - 1)
         {
             tokens[token_count++] = token;
@@ -643,25 +625,32 @@ int main_pipe(int argc, char *argv[], char *envp[])
         }
         tokens[token_count] = NULL;
         if (token_count == 0)
+        {
+            free(line);
             continue;
+        }
         if (strcmp(tokens[0], "exit") == 0)
         {
             printf("Exiting shell...\n");
+            free(line);
             break;
         }
         else if (strcmp(tokens[0], "pwd") == 0)
         {
             handle_pwd();
+            free(line);
             continue;
         }
         else if (strcmp(tokens[0], "ls") == 0)
         {
             handle_ls();
+            free(line);
             continue;
         }
         else if (strcmp(tokens[0], "cd") == 0)
         {
             handle_cd(tokens[1]);
+            free(line);
             continue;
         }
         char *cmd_argv[MAX_ARGS];
@@ -690,8 +679,12 @@ int main_pipe(int argc, char *argv[], char *envp[])
         }
         cmd_argv[cmd_argc] = NULL;
         if (cmd_argc == 0)
+        {
+            free(line);
             continue;
+        }
         LaunchFunction(cmd_argv, input_file, -1);
+        free(line);
     }
     return EXIT_SUCCESS;
 }
