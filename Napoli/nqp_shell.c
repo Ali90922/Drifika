@@ -25,6 +25,9 @@ char cwd[MAX_LINE_SIZE] = "/";
 /* Global flag: set to 1 when executing a pipeline */
 int pipeline_mode = 0;
 
+/* We'll need this to inherit the parent's environment for execve. */
+extern char **environ;
+
 /* Function declarations */
 void handle_cd(char *dir);
 void handle_pwd(void);
@@ -279,9 +282,12 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         perror("lseek after header debug");
         return;
     }
+
+    /* If not in pipeline for head/tail, fix file args: */
     if (!(pipeline_mode && (strcmp(cmd_argv[0], "head") == 0 || strcmp(cmd_argv[0], "tail") == 0)))
         fix_file_args(cmd_argv);
 
+    /* If it's a shell script (#!), copy to a temp file and execve that. */
     if (debug_header[0] == '#' && debug_header[1] == '!')
     {
         printf("Detected shell script, using temporary file workaround\n");
@@ -325,6 +331,7 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         }
         if (pid == 0)
         {
+            /* Child: Setup input redirection if needed */
             if (input_file != NULL || input_fd_override != -1)
             {
                 int input_fd;
@@ -345,18 +352,17 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
                 }
                 close(input_fd);
             }
+            /* Switch working directory to 'cwd'. */
             if (chdir(cwd) == -1)
             {
                 perror("chdir");
                 exit(1);
             }
+            /* Use parent's environment so script can find commands in PATH. */
+            if (execve(tmp_template, cmd_argv, environ) == -1)
             {
-                char *envp[] = {NULL};
-                if (execve(tmp_template, cmd_argv, envp) == -1)
-                {
-                    perror("execve");
-                    exit(1);
-                }
+                perror("execve");
+                exit(1);
             }
         }
         else
@@ -367,6 +373,7 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
     }
     else
     {
+        /* It's an ELF or other binary, do fexecve() in a child process. */
         pid_t pid = fork();
         if (pid == -1)
         {
@@ -395,13 +402,11 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
                 }
                 close(input_fd);
             }
+            /* Use parent's environment for fexecve as well. */
+            if (fexecve(InMemoryFile, cmd_argv, environ) == -1)
             {
-                char *envp[] = {NULL};
-                if (fexecve(InMemoryFile, cmd_argv, envp) == -1)
-                {
-                    perror("fexecve");
-                    exit(1);
-                }
+                perror("fexecve");
+                exit(1);
             }
         }
         else
@@ -412,7 +417,7 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
     }
 }
 
-/* LaunchSinglePipe implementation unchanged... */
+/* LaunchSinglePipe: one-pipe command logic unchanged except the fix. */
 void LaunchSinglePipe(char *line)
 {
     char *saveptr;
@@ -495,90 +500,37 @@ void LaunchSinglePipe(char *line)
 
     printf("Check 3\n");
 
+    /* Fork for left side */
     pid_t pid1 = fork();
-    printf("Check 4\n");
+
     if (pid1 == 0)
     {
-        printf("Inside Child Process No 1 \n");
-
-        if (input_file != NULL)
-        {
-            int in_fd = setup_input_redirection(input_file);
-            if (in_fd == -1)
-                exit(1);
-            if (dup2(in_fd, STDIN_FILENO) == -1)
-            {
-                perror("dup2 for input");
-                exit(1);
-            }
-            close(in_fd);
-        }
-
-        printf("Check 11\n");
-
-        if (dup2(pipe_fd[1], STDOUT_FILENO) == -1)
-        {
-            perror("dup2 failed");
-            exit(1);
-        }
-
-        printf("Check 6\n");
-        printf("[DEBUG] STDOUT now set to pipe_fd[1]: %d\n", pipe_fd[1]);
-
-        if (close(pipe_fd[0]) == -1)
-        {
-            perror("close pipe_fd[0] failed");
-            exit(1);
-        }
-        printf("Check 7\n");
-        printf("[DEBUG] Closed pipe_fd[0]\n");
-
-        if (close(pipe_fd[1]) == -1)
-        {
-            perror("close pipe_fd[1] failed");
-            exit(1);
-        }
-        printf("[DEBUG] Closed pipe_fd[1]\n");
-
-        printf("[DEBUG] Executing left command...\n");
+        printf("Check 44444\n");
+        dup2(pipe_fd[1], STDOUT_FILENO);
+        close(pipe_fd[0]);
+        close(pipe_fd[1]);
         LaunchFunction(left_tokens, input_file, -1);
         exit(0);
     }
 
+    /* Fork for right side */
     pid_t pid2 = fork();
     if (pid2 == 0)
     {
-        printf("Inside Child Process No 2 ! \n");
-        close(pipe_fd[1]);
-        printf("Checker 91 \n");
-        int pipe_read_dup = dup(pipe_fd[0]);
-        printf("Checker 92 \n");
+        printf("Inside Child Process No 2 (Head Process)! \n");
+        // Redirect STDIN to the read end of the pipe:
+        dup2(pipe_fd[0], STDIN_FILENO);
         close(pipe_fd[0]);
+        close(pipe_fd[1]);
 
-        printf("Checker 93 \n");
-        if (strcmp(right_tokens[0], "head") == 0 || strcmp(right_tokens[0], "tail") == 0)
-        {
-            printf("Checker 94 \n");
-            int j = 1;
-            for (int i = 1; right_tokens[i] != NULL; i++)
-            {
-                if (right_tokens[i][0] == '-')
-                    right_tokens[j++] = right_tokens[i];
-            }
-            right_tokens[j] = NULL;
+        LaunchFunction(right_tokens, NULL, -1);
 
-            printf("Checker 95 \n");
-        }
-
-        LaunchFunction(right_tokens, NULL, pipe_read_dup);
-        printf("Checker 96 \n");
         exit(0);
     }
 
     close(pipe_fd[0]);
-    printf("Checker 97 \n");
     close(pipe_fd[1]);
-    printf("Checker 98 \n");
+
     waitpid(pid1, NULL, 0);
     printf("Checker 99 \n");
     waitpid(pid2, NULL, 0);
@@ -625,12 +577,16 @@ int main_pipe(int argc, char *argv[], char *envp[])
             free(line);
             continue;
         }
+
+        /* Pipeline detection */
         if (strchr(line, '|') != NULL)
         {
             LaunchSinglePipe(line);
             free(line);
             continue;
         }
+
+        /* Tokenize the input line */
         int token_count = 0;
         char *token = strtok(line, " ");
         while (token != NULL && token_count < MAX_ARGS - 1)
@@ -644,6 +600,8 @@ int main_pipe(int argc, char *argv[], char *envp[])
             free(line);
             continue;
         }
+
+        /* Built-in commands */
         if (strcmp(tokens[0], "exit") == 0)
         {
             printf("Exiting shell...\n");
@@ -668,6 +626,8 @@ int main_pipe(int argc, char *argv[], char *envp[])
             free(line);
             continue;
         }
+
+        /* Parse any "< file" redirection from tokens */
         char *cmd_argv[MAX_ARGS];
         int cmd_argc = 0;
         char *input_file = NULL;
@@ -698,6 +658,8 @@ int main_pipe(int argc, char *argv[], char *envp[])
             free(line);
             continue;
         }
+
+        /* Run the single command */
         LaunchFunction(cmd_argv, input_file, -1);
         free(line);
     }
