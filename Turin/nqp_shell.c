@@ -364,6 +364,8 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
                 perror("execve");
                 exit(1);
             }
+            fflush(stdout);
+            fflush(stderr);
         }
         else
         {
