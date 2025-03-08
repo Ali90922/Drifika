@@ -497,7 +497,7 @@ void LaunchSinglePipe(char *line)
 
     // Forking Happens Here !
     // This is still the Parent Prcoess
-    LaunchFunction(left_tokens, input_file, -1);
+    // LaunchFunction(left_tokens, input_file, -1);
 
     pid_t pid1 = fork();
 
