@@ -498,30 +498,14 @@ void LaunchSinglePipe(char *line)
     // Forking Happens Here !
     pid_t pid1 = fork();
     printf("Check 4\n");
+
     if (pid1 == 0)
     {
         printf("Inside Child Process No 1 \n");
 
-        if (input_file != NULL)
-        {
-            int in_fd = setup_input_redirection(input_file);
-            if (in_fd == -1)
-                exit(1);
-            if (dup2(in_fd, STDIN_FILENO) == -1)
-            {
-                perror("dup2 for input");
-                exit(1);
-            }
-            close(in_fd);
-        }
-
         printf("Check 11\n");
 
-        if (dup2(pipe_fd[1], STDOUT_FILENO) == -1)
-        {
-            perror("dup2 failed");
-            exit(1);
-        }
+        dup2(pipe_fd[1], STDOUT_FILENO);
 
         printf("Check 6\n");
         printf("[DEBUG] STDOUT now set to pipe_fd[1]: %d\n", pipe_fd[1]);
