@@ -515,8 +515,8 @@ void LaunchSinglePipe(char *line)
         exit(0);
     }
 
-    // close(pipe_fd[0]);
-    // close(pipe_fd[1]);
+    close(pipe_fd[0]);
+    close(pipe_fd[1]);
 
     waitpid(pid1, NULL, 0);
     printf("Checker 99 \n");
