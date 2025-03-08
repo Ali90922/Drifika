@@ -548,6 +548,7 @@ void LaunchSinglePipe(char *line)
     pid_t pid2 = fork();
     if (pid2 == 0)
     {
+        printf("Inside Child Process No 2 ! \n");
         close(pipe_fd[1]);
         int pipe_read_dup = dup(pipe_fd[0]);
         close(pipe_fd[0]);
