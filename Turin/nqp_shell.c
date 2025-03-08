@@ -508,6 +508,7 @@ void LaunchSinglePipe(char *line)
         close(pipe_fd[0]);
         close(pipe_fd[1]);
         LaunchFunction(left_tokens, input_file, -1);
+        exit(0);
     }
 
     pid_t pid2 = fork();
