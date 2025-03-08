@@ -205,14 +205,11 @@ void handle_ls(void)
     }
 }
 
-/* LaunchFunction: Execute a single command (with or without a pipe). */
-void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
+/* New helper function to fix the executable for head/tail in pipeline mode */
+void fix_executable_path(char **cmd_argv)
 {
-    int exec_fd = 0;
     char abs_path[MAX_LINE_SIZE];
-
-    /* Construct absolute path: if command doesn't start with '/', use cwd.
-       If cwd is "/" then ensure the command gets a leading '/' */
+    /* Construct absolute path for cmd_argv[0] */
     if (cmd_argv[0][0] != '/')
     {
         if (strcmp(cwd, "/") == 0)
@@ -225,15 +222,71 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         strncpy(abs_path, cmd_argv[0], sizeof(abs_path));
     }
 
+    int fd = nqp_open(abs_path);
+    if (fd != NQP_FILE_NOT_FOUND)
+    {
+        char tmp_template[] = "/tmp/volfileXXXXXX";
+        int tmp_fd = mkstemp(tmp_template);
+        if (tmp_fd == -1)
+        {
+            perror("mkstemp for command executable");
+            nqp_close(fd);
+            return;
+        }
+        ssize_t r, w;
+        char buf[BUFFER_SIZE];
+        while ((r = nqp_read(fd, buf, BUFFER_SIZE)) > 0)
+        {
+            w = write(tmp_fd, buf, r);
+            if (w != r)
+            {
+                perror("write to temporary file for command executable");
+                break;
+            }
+        }
+        close(tmp_fd);
+        nqp_close(fd);
+        /* Replace cmd_argv[0] with the temporary file path */
+        cmd_argv[0] = strdup(tmp_template);
+    }
+}
+
+/* Modified LaunchFunction */
+void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
+{
+    int exec_fd = 0;
+    char abs_path[MAX_LINE_SIZE];
+
+    /* When in pipeline mode and executing head/tail, fix the executable path */
+    if (pipeline_mode && (strcmp(cmd_argv[0], "head") == 0 || strcmp(cmd_argv[0], "tail") == 0))
+    {
+        fix_executable_path(cmd_argv);
+    }
+    else
+    {
+        /* Construct absolute path normally */
+        if (cmd_argv[0][0] != '/')
+        {
+            if (strcmp(cwd, "/") == 0)
+                snprintf(abs_path, sizeof(abs_path), "/%s", cmd_argv[0]);
+            else
+                snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[0]);
+        }
+        else
+        {
+            strncpy(abs_path, cmd_argv[0], sizeof(abs_path));
+        }
+    }
+
     /* Special-case: if the command name starts with "._", skip the "._" */
     if (strncmp(cmd_argv[0], "._", 2) == 0)
         cmd_argv[0] += 2;
 
-    /* Try opening the command */
-    exec_fd = nqp_open(abs_path);
+    /* Try opening the command (using the possibly fixed path in cmd_argv[0]) */
+    exec_fd = nqp_open(cmd_argv[0]);
     if (exec_fd == NQP_FILE_NOT_FOUND)
     {
-        /* If not found, try looking in /bin */
+        /* Fallback: try /bin */
         char bin_path[MAX_LINE_SIZE];
         snprintf(bin_path, sizeof(bin_path), "/bin/%s", cmd_argv[0]);
         exec_fd = nqp_open(bin_path);
@@ -244,7 +297,6 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         }
         else
         {
-            /* Use the /bin version */
             strncpy(abs_path, bin_path, sizeof(abs_path));
         }
     }
@@ -303,7 +355,7 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         return;
     }
 
-    /* For non-pipeline commands (or non-head/tail), fix file arguments */
+    /* For non-pipeline commands (or non-head/tail) fix file arguments */
     if (!(pipeline_mode && (strcmp(cmd_argv[0], "head") == 0 || strcmp(cmd_argv[0], "tail") == 0)))
         fix_file_args(cmd_argv);
 
