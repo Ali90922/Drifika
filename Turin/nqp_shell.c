@@ -496,10 +496,9 @@ void LaunchSinglePipe(char *line)
     printf("Check 3\n");
 
     // Forking Happens Here !
+    LaunchFunction(left_tokens, input_file, -1);
     pid_t pid1 = fork();
     printf("Check 4\n");
-
-    LaunchFunction(left_tokens, input_file, -1);
 
     if (pid1 == 0)
     {
