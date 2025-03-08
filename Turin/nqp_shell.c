@@ -499,12 +499,13 @@ void LaunchSinglePipe(char *line)
     pid_t pid1 = fork();
     printf("Check 4\n");
 
+    LaunchFunction(left_tokens, input_file, -1);
+
     if (pid1 == 0)
     {
         printf("Inside Child Process No 1 \n");
 
         printf("Check 11\n");
-        LaunchFunction(left_tokens, input_file, -1);
 
         dup2(pipe_fd[1], STDOUT_FILENO);
 
@@ -529,7 +530,6 @@ void LaunchSinglePipe(char *line)
     if (pid2 == 0)
     {
         printf("Inside Child Process No 2 (Head Process)! \n");
-        LaunchFunction(right_tokens, NULL, -1);
 
         dup2(pipe_fd[0], STDIN_FILENO);
         close(pipe_fd[0]);
