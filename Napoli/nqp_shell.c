@@ -38,6 +38,68 @@ void LaunchFunction(char **cmd_argv, char *input_file);
 /* If user typed `< file`, set up memfd for input. */
 int setup_input_redirection(const char *filename);
 
+/*
+ * fix_file_args:
+ *   For each argument *after* cmd_argv[0], see if it refers to a file on the volume.
+ *   If so, copy that file to /tmp/volfileXXXXXX and rewrite cmd_argv[i].
+ *   This ensures the script on the host side can open that temp file.
+ */
+static void fix_file_args(char **cmd_argv)
+{
+    /* cmd_argv[0] is the name of the command itself (like "cat" or "head").
+       We start from i=1 to examine the command's file arguments. */
+    for (int i = 1; cmd_argv[i] != NULL; i++)
+    {
+        /* We'll skip arguments that begin with '-' (like "-l" or "-4"),
+           since those are usually options, not filenames. */
+        if (cmd_argv[i][0] == '-')
+            continue;
+
+        /* Build an absolute path on the volume. */
+        char abs_path[MAX_LINE_SIZE];
+        if (strcmp(cwd, "/") == 0)
+            snprintf(abs_path, sizeof(abs_path), "/%s", cmd_argv[i]); /* <-- Add leading slash if at root */
+        else
+            snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[i]);
+
+        int fd = nqp_open(abs_path);
+        if (fd == NQP_FILE_NOT_FOUND)
+        {
+            /* Not a file in the volume -> do nothing,
+               the script might handle it or error out. */
+            continue;
+        }
+
+        /* If found in the volume, copy it to a host temp file. */
+        char tmp_template[] = "/tmp/volfileXXXXXX";
+        int tmp_fd = mkstemp(tmp_template);
+        if (tmp_fd == -1)
+        {
+            perror("mkstemp for file argument");
+            nqp_close(fd);
+            continue;
+        }
+
+        /* Copy contents from volume to the host temp file. */
+        ssize_t r, w;
+        char buf[BUFFER_SIZE];
+        while ((r = nqp_read(fd, buf, sizeof(buf))) > 0)
+        {
+            w = write(tmp_fd, buf, r);
+            if (w != r)
+            {
+                perror("write to temporary file for argument");
+                break;
+            }
+        }
+        close(tmp_fd);
+        nqp_close(fd);
+
+        /* Rewrite the argument to point to the temp file. */
+        cmd_argv[i] = strdup(tmp_template);
+    }
+}
+
 /* ========== Built-in commands ========== */
 
 /* handle_pwd: Print the current working directory on the volume */
@@ -118,11 +180,11 @@ void handle_ls(void)
 int setup_input_redirection(const char *filename)
 {
     char input_abs[MAX_LINE_SIZE];
-    /* Build absolute path: "cwd/filename" or just "/filename" */
+    /* Build absolute path: "cwd/filename" or "/filename" at root */
     if (filename[0] != '/')
     {
         if (strcmp(cwd, "/") == 0)
-            snprintf(input_abs, sizeof(input_abs), "%s", filename);
+            snprintf(input_abs, sizeof(input_abs), "/%s", filename);
         else
             snprintf(input_abs, sizeof(input_abs), "%s/%s", cwd, filename);
     }
@@ -175,16 +237,16 @@ int setup_input_redirection(const char *filename)
 /*
  * LaunchFunction:
  * 1. Construct absolute path from cwd + cmd_argv[0].
- * 2. Open that file via nqp_open.
- * 3. Copy it into a memfd using nqp_read + write.
- * 4. fork() → in child → possibly set up STDIN if input_file != NULL → fexecve().
+ * 2. Open that file via nqp_open, copy it into a memfd.
+ * 3. fix_file_args() for arguments i=1.. to handle volume-based files.
+ * 4. fork() → in child → possibly set up STDIN if input_file != NULL → fexecve() or script workaround.
  */
 void LaunchFunction(char **cmd_argv, char *input_file)
 {
-    /* Build absolute path to the command in the volume. */
+    /* Build absolute path for the command itself. */
     char abs_path[MAX_LINE_SIZE];
     if (strcmp(cwd, "/") == 0)
-        snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[0]);
+        snprintf(abs_path, sizeof(abs_path), "/%s", cmd_argv[0]);
     else
         snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[0]);
 
@@ -247,7 +309,7 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         close(InMemoryFile);
         return;
     }
-    /* Rewind. */
+    /* Rewind the in-memory file. */
     if (lseek(InMemoryFile, 0, SEEK_SET) == -1)
     {
         perror("lseek after check header");
@@ -255,7 +317,13 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         return;
     }
 
-    /* fork → child does fexecve or the script workaround. */
+    /*
+     * CRUCIAL STEP: For arguments *besides* the command name,
+     * see if they are volume-based files. If so, map them to /tmp/volfileXXXX.
+     */
+    fix_file_args(cmd_argv);
+
+    /* Now fork → child does fexecve or the script workaround. */
     pid_t pid = fork();
     if (pid == -1)
     {
@@ -280,20 +348,20 @@ void LaunchFunction(char **cmd_argv, char *input_file)
             }
             close(redir_fd);
         }
-        /* Also chdir to the "cwd" inside the volume. (So commands that do relative file opens work.) */
+        /* Also chdir to the "cwd" inside the volume. */
         if (chdir(cwd) == -1)
         {
             perror("chdir");
             exit(1);
         }
 
-        /* If it is a #! script, do a "temp file" workaround. */
+        /* If #! script, do the "temp file" workaround. */
         if (debug_header[0] == '#' && debug_header[1] == '!')
         {
             printf("Detected shell script, using temporary file workaround\n");
             fflush(stdout);
 
-            /* Create a real temp file. */
+            /* Create a real temp file on the host. */
             char tmp_template[] = "/tmp/scriptXXXXXX";
             int tmp_fd = mkstemp(tmp_template);
             if (tmp_fd == -1)
@@ -325,7 +393,7 @@ void LaunchFunction(char **cmd_argv, char *input_file)
             }
             close(tmp_fd);
 
-            /* execve that temp file with parent's environment. */
+            /* Exec the script with parent's environment. */
             if (execve(tmp_template, cmd_argv, environ) == -1)
             {
                 perror("execve for #! script");
@@ -334,7 +402,7 @@ void LaunchFunction(char **cmd_argv, char *input_file)
         }
         else
         {
-            /* It's presumably an ELF or other binary, so we do fexecve. */
+            /* It's presumably ELF or other binary => fexecve. */
             if (fexecve(InMemoryFile, cmd_argv, environ) == -1)
             {
                 perror("fexecve");
@@ -345,7 +413,7 @@ void LaunchFunction(char **cmd_argv, char *input_file)
     }
     else
     {
-        /* Parent: just wait for child. */
+        /* Parent: just wait for child, then close InMemoryFile. */
         int status;
         waitpid(pid, &status, 0);
         close(InMemoryFile);
@@ -356,7 +424,7 @@ void LaunchFunction(char **cmd_argv, char *input_file)
 
 int main(int argc, char *argv[], char *envp[])
 {
-    (void)envp;
+    (void)envp; // Silence unused parameter warning
 
     if (argc != 2)
     {
@@ -433,7 +501,6 @@ int main(int argc, char *argv[], char *envp[])
         }
 
         /* Possibly parse input redirection: "cmd < inputfile". */
-        /* We'll separate that out from the main command. */
         char *cmd_argv[MAX_ARGS];
         int cmd_argc = 0;
         char *input_file = NULL;
