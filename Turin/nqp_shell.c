@@ -583,6 +583,7 @@ void LaunchSinglePipe(char *line)
 
 int main_pipe(int argc, char *argv[], char *envp[])
 {
+    (void)envp;
     if (argc != 2)
     {
         fprintf(stderr, "Usage: ./nqp_shell volume.img\n");
