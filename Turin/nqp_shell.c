@@ -520,21 +520,7 @@ void LaunchSinglePipe(char *line)
         close(pipe_fd[0]);
         close(pipe_fd[1]);
 
-        // Reserve FD 0 so that nqp_open won’t reuse it.
-        // For instance, open /dev/null (this will return a descriptor >= 0,
-        // and if FD 0 is in use, the next available FD will be >= 3).
-        int dummy = open("/dev/null", O_RDWR);
-        if (dummy < 0)
-        {
-            perror("open /dev/null");
-            exit(1);
-        }
-
-        // Now call the launch function for "head"
         LaunchFunction(right_tokens, NULL, -1);
-
-        // Clean up dummy FD
-        close(dummy);
 
         exit(0);
     }
