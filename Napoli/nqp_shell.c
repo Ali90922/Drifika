@@ -550,10 +550,15 @@ void LaunchSinglePipe(char *line)
     {
         printf("Inside Child Process No 2 ! \n");
         close(pipe_fd[1]);
+        printf("Checker 91 \n");
         int pipe_read_dup = dup(pipe_fd[0]);
+        printf("Checker 92 \n");
         close(pipe_fd[0]);
+
+        printf("Checker 93 \n");
         if (strcmp(right_tokens[0], "head") == 0 || strcmp(right_tokens[0], "tail") == 0)
         {
+            printf("Checker 94 \n");
             int j = 1;
             for (int i = 1; right_tokens[i] != NULL; i++)
             {
@@ -561,15 +566,23 @@ void LaunchSinglePipe(char *line)
                     right_tokens[j++] = right_tokens[i];
             }
             right_tokens[j] = NULL;
+
+            printf("Checker 95 \n");
         }
+
         LaunchFunction(right_tokens, NULL, pipe_read_dup);
+        printf("Checker 96 \n");
         exit(0);
     }
 
     close(pipe_fd[0]);
+    printf("Checker 97 \n");
     close(pipe_fd[1]);
+    printf("Checker 98 \n");
     waitpid(pid1, NULL, 0);
+    printf("Checker 99 \n");
     waitpid(pid2, NULL, 0);
+    printf("Checker 999 \n");
     pipeline_mode = 0;
 }
 
