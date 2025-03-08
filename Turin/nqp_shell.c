@@ -214,7 +214,7 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
     if (strcmp(cwd, "/") == 0)
         snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[0]);
     else
-        snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[0]);
+        snprintf(abs_path, sizeof(abs_path), "/bin/%s", cmd_argv[0]);
 
     /* Special-case: if the command name starts with "._", skip the "._" */
     if (strncmp(cmd_argv[0], "._", 2) == 0)
