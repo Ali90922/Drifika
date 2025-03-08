@@ -205,100 +205,26 @@ void handle_ls(void)
     }
 }
 
-/* New helper function to fix the executable for head/tail in pipeline mode */
-void fix_executable_path(char **cmd_argv)
-{
-    char abs_path[MAX_LINE_SIZE];
-    /* Construct absolute path for cmd_argv[0] */
-    if (cmd_argv[0][0] != '/')
-    {
-        if (strcmp(cwd, "/") == 0)
-            snprintf(abs_path, sizeof(abs_path), "/%s", cmd_argv[0]);
-        else
-            snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[0]);
-    }
-    else
-    {
-        strncpy(abs_path, cmd_argv[0], sizeof(abs_path));
-    }
-
-    int fd = nqp_open(abs_path);
-    if (fd != NQP_FILE_NOT_FOUND)
-    {
-        char tmp_template[] = "/tmp/volfileXXXXXX";
-        int tmp_fd = mkstemp(tmp_template);
-        if (tmp_fd == -1)
-        {
-            perror("mkstemp for command executable");
-            nqp_close(fd);
-            return;
-        }
-        ssize_t r, w;
-        char buf[BUFFER_SIZE];
-        while ((r = nqp_read(fd, buf, BUFFER_SIZE)) > 0)
-        {
-            w = write(tmp_fd, buf, r);
-            if (w != r)
-            {
-                perror("write to temporary file for command executable");
-                break;
-            }
-        }
-        close(tmp_fd);
-        nqp_close(fd);
-        /* Replace cmd_argv[0] with the temporary file path */
-        cmd_argv[0] = strdup(tmp_template);
-    }
-}
-
-/* Modified LaunchFunction */
+/* LaunchFunction: Execute a single command (with or without a pipe). */
 void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
 {
     int exec_fd = 0;
     char abs_path[MAX_LINE_SIZE];
 
-    /* When in pipeline mode and executing head/tail, fix the executable path */
-    if (pipeline_mode && (strcmp(cmd_argv[0], "head") == 0 || strcmp(cmd_argv[0], "tail") == 0))
-    {
-        fix_executable_path(cmd_argv);
-    }
+    if (strcmp(cwd, "/") == 0)
+        snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[0]);
     else
-    {
-        /* Construct absolute path normally */
-        if (cmd_argv[0][0] != '/')
-        {
-            if (strcmp(cwd, "/") == 0)
-                snprintf(abs_path, sizeof(abs_path), "/%s", cmd_argv[0]);
-            else
-                snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[0]);
-        }
-        else
-        {
-            strncpy(abs_path, cmd_argv[0], sizeof(abs_path));
-        }
-    }
+        snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[0]);
 
     /* Special-case: if the command name starts with "._", skip the "._" */
     if (strncmp(cmd_argv[0], "._", 2) == 0)
         cmd_argv[0] += 2;
 
-    /* Try opening the command (using the possibly fixed path in cmd_argv[0]) */
-    exec_fd = nqp_open(cmd_argv[0]);
+    exec_fd = nqp_open(abs_path);
     if (exec_fd == NQP_FILE_NOT_FOUND)
     {
-        /* Fallback: try /bin */
-        char bin_path[MAX_LINE_SIZE];
-        snprintf(bin_path, sizeof(bin_path), "/bin/%s", cmd_argv[0]);
-        exec_fd = nqp_open(bin_path);
-        if (exec_fd == NQP_FILE_NOT_FOUND)
-        {
-            fprintf(stderr, "Command %s not found\n", cmd_argv[0]);
-            return;
-        }
-        else
-        {
-            strncpy(abs_path, bin_path, sizeof(abs_path));
-        }
+        fprintf(stderr, "Command %s not found\n", abs_path);
+        return;
     }
     printf("File Descriptor for command (%s) is : %d\n", abs_path, exec_fd);
 
@@ -348,32 +274,18 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         printf("%02x ", debug_header[i]);
     printf("\n");
     fflush(stdout);
-
     if (lseek(InMemoryFile, 0, SEEK_SET) == -1)
     {
         perror("lseek after header debug");
         return;
     }
-
-    /* For non-pipeline commands (or non-head/tail) fix file arguments */
     if (!(pipeline_mode && (strcmp(cmd_argv[0], "head") == 0 || strcmp(cmd_argv[0], "tail") == 0)))
         fix_file_args(cmd_argv);
 
-    /* Introduce a flag to force the temporary file workaround for head/tail in pipeline mode */
-    int force_temp_file = 0;
-    if (pipeline_mode && (strcmp(cmd_argv[0], "head") == 0 || strcmp(cmd_argv[0], "tail") == 0))
-        force_temp_file = 1;
-
-    /* If the in-memory file has a shell script header OR we are forcing the temporary file workaround,
-       use the temporary file approach */
-    if ((debug_header[0] == '#' && debug_header[1] == '!') || force_temp_file)
+    if (debug_header[0] == '#' && debug_header[1] == '!')
     {
-        if (debug_header[0] == '#' && debug_header[1] == '!')
-            printf("Detected shell script, using temporary file workaround\n");
-        else
-            printf("Forcing temporary file workaround for %s\n", cmd_argv[0]);
+        printf("Detected shell script, using temporary file workaround\n");
         fflush(stdout);
-
         char tmp_template[] = "/tmp/scriptXXXXXX";
         int tmp_fd = mkstemp(tmp_template);
         if (tmp_fd == -1)
@@ -500,7 +412,7 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
     }
 }
 
-/* LaunchSinglePipe implementation unchanged... */
+/* LaunchSinglePipe implementation unchanged except for the right-child fix... */
 void LaunchSinglePipe(char *line)
 {
     char *saveptr;
@@ -637,28 +549,19 @@ void LaunchSinglePipe(char *line)
     if (pid2 == 0)
     {
         printf("Inside Child Process No 2 ! \n");
+        /* For the right child, close the write end of the pipe and
+           force the pipe's read end onto STDIN so that FD 0 is occupied. */
         close(pipe_fd[1]);
-        printf("Checker 91 \n");
-        int pipe_read_dup = dup(pipe_fd[0]);
-        printf("Checker 92 \n");
+        if (dup2(pipe_fd[0], STDIN_FILENO) == -1)
+        {
+            perror("dup2");
+            exit(1);
+        }
         close(pipe_fd[0]);
 
-        printf("Checker 93 \n");
-        if (strcmp(right_tokens[0], "head") == 0 || strcmp(right_tokens[0], "tail") == 0)
-        {
-            printf("Checker 94 \n");
-            int j = 1;
-            for (int i = 1; right_tokens[i] != NULL; i++)
-            {
-                if (right_tokens[i][0] == '-')
-                    right_tokens[j++] = right_tokens[i];
-            }
-            right_tokens[j] = NULL;
-
-            printf("Checker 95 \n");
-        }
-
-        LaunchFunction(right_tokens, NULL, pipe_read_dup);
+        printf("Checker 91 \n");
+        /* Pass -1 for input_fd_override since STDIN is already set */
+        LaunchFunction(right_tokens, NULL, -1);
         printf("Checker 96 \n");
         exit(0);
     }
