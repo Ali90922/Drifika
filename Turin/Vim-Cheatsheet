@@ -1,0 +1,141 @@
+# Vim Cheatsheet
+
+## Basic Vim Commands
+| Command | Description |
+|---------|-------------|
+| `vim filename` | Open file in Vim |
+| `:q` | Quit (fails if there are unsaved changes) |
+| `:q!` | Quit without saving |
+| `:w` | Save file |
+| `:wq` or `ZZ` | Save and quit |
+| `:x` | Save and exit (only if changes were made) |
+| `:e filename` | Open another file |
+| `:w filename` | Save to a different file |
+| `:set nu` | Show line numbers |
+| `:set nonu` | Hide line numbers |
+
+## Modes
+| Mode | Command to Enter |
+|------|----------------|
+| Normal | Press `Esc` |
+| Insert | Press `i`, `I`, `a`, `A` |
+| Visual | Press `v`, `V`, `Ctrl+v` |
+| Command-Line | Press `:` |
+
+## Navigation
+| Command | Description |
+|---------|-------------|
+| `h` | Move left |
+| `l` | Move right |
+| `j` | Move down |
+| `k` | Move up |
+| `w` | Jump to start of next word |
+| `b` | Jump to start of previous word |
+| `0` | Move to start of line |
+| `^` | Move to first non-blank character of line |
+| `$` | Move to end of line |
+| `gg` | Go to beginning of file |
+| `G` | Go to end of file |
+| `:n` | Go to line number `n` |
+| `Ctrl+d` | Move half-page down |
+| `Ctrl+u` | Move half-page up |
+| `Ctrl+f` | Move full page down |
+| `Ctrl+b` | Move full page up |
+
+## Editing
+| Command | Description |
+|---------|-------------|
+| `i` | Insert before cursor |
+| `a` | Append after cursor |
+| `o` | Open new line below cursor |
+| `O` | Open new line above cursor |
+| `r` | Replace a single character |
+| `R` | Enter Replace mode |
+| `x` | Delete character under cursor |
+| `X` | Delete character before cursor |
+| `dd` | Delete (cut) current line |
+| `D` | Delete from cursor to end of line |
+| `yy` or `Y` | Yank (copy) current line |
+| `p` | Paste after cursor |
+| `P` | Paste before cursor |
+| `u` | Undo last change |
+| `Ctrl+r` | Redo last undone change |
+| `.` | Repeat last change |
+
+## Searching
+| Command | Description |
+|---------|-------------|
+| `/pattern` | Search forward for "pattern" |
+| `?pattern` | Search backward for "pattern" |
+| `n` | Repeat search forward |
+| `N` | Repeat search backward |
+| `*` | Search forward for word under cursor |
+| `#` | Search backward for word under cursor |
+
+## Find & Replace
+| Command | Description |
+|---------|-------------|
+| `:%s/old/new/g` | Replace all occurrences of "old" with "new" in the whole file |
+| `:s/old/new/g` | Replace all occurrences of "old" with "new" in current line |
+| `:%s/old/new/gc` | Replace all with confirmation |
+| `:.,+2s/old/new/g` | Replace "old" with "new" in current and next 2 lines |
+
+## Copy, Cut, and Paste
+| Command | Description |
+|---------|-------------|
+| `v` | Start visual mode for character selection |
+| `V` | Start visual mode for line selection |
+| `Ctrl+v` | Start block visual mode |
+| `y` | Yank (copy) selection |
+| `d` | Cut selection |
+| `p` | Paste after cursor |
+| `P` | Paste before cursor |
+
+## Indentation
+| Command | Description |
+|---------|-------------|
+| `>>` | Indent current line |
+| `<<` | Unindent current line |
+| `:set tabstop=4` | Set tab width to 4 spaces |
+| `:set expandtab` | Use spaces instead of tabs |
+
+## Working with Multiple Files
+| Command | Description |
+|---------|-------------|
+| `:e filename` | Open a new file |
+| `:bn` | Next buffer |
+| `:bp` | Previous buffer |
+| `:bd` | Close buffer |
+| `:split filename` | Open file in horizontal split |
+| `:vsplit filename` | Open file in vertical split |
+| `Ctrl+w w` | Switch between splits |
+| `Ctrl+w q` | Close current split |
+
+## Registers (Clipboard)
+| Command | Description |
+|---------|-------------|
+| `"ay` | Yank into register `a` |
+| `"ap` | Paste from register `a` |
+| `:registers` | Show all registers |
+
+## Macros
+| Command | Description |
+|---------|-------------|
+| `qa` | Start recording macro into register `a` |
+| `q` | Stop recording |
+| `@a` | Run macro stored in `a` |
+| `@@` | Repeat last macro |
+
+## Exiting
+| Command | Description |
+|---------|-------------|
+| `:q!` | Quit without saving |
+| `:wq` or `ZZ` | Save and quit |
+| `:x` | Save only if changes were made |
+
+## Bonus: Vim Survival Commands
+If you're stuck in Vim:
+1. **Press `Esc`**
+2. Type `:q!` and hit **Enter** (Exit without saving)
+3. If you need to save first, type `:wq` and hit **Enter**
+
