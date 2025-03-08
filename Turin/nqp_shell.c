@@ -412,7 +412,7 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
     }
 }
 
-/* LaunchSinglePipe implementation unchanged except for the right-child fix... */
+/* LaunchSinglePipe implementation unchanged... */
 void LaunchSinglePipe(char *line)
 {
     char *saveptr;
@@ -495,6 +495,7 @@ void LaunchSinglePipe(char *line)
 
     printf("Check 3\n");
 
+    // Forking Happens Here !
     pid_t pid1 = fork();
     printf("Check 4\n");
     if (pid1 == 0)
@@ -549,19 +550,28 @@ void LaunchSinglePipe(char *line)
     if (pid2 == 0)
     {
         printf("Inside Child Process No 2 ! \n");
-        /* For the right child, close the write end of the pipe and
-           force the pipe's read end onto STDIN so that FD 0 is occupied. */
         close(pipe_fd[1]);
-        if (dup2(pipe_fd[0], STDIN_FILENO) == -1)
-        {
-            perror("dup2");
-            exit(1);
-        }
+        printf("Checker 91 \n");
+        int pipe_read_dup = dup(pipe_fd[0]);
+        printf("Checker 92 \n");
         close(pipe_fd[0]);
 
-        printf("Checker 91 \n");
-        /* Pass -1 for input_fd_override since STDIN is already set */
-        LaunchFunction(right_tokens, NULL, -1);
+        printf("Checker 93 \n");
+        if (strcmp(right_tokens[0], "head") == 0 || strcmp(right_tokens[0], "tail") == 0)
+        {
+            printf("Checker 94 \n");
+            int j = 1;
+            for (int i = 1; right_tokens[i] != NULL; i++)
+            {
+                if (right_tokens[i][0] == '-')
+                    right_tokens[j++] = right_tokens[i];
+            }
+            right_tokens[j] = NULL;
+
+            printf("Checker 95 \n");
+        }
+
+        LaunchFunction(right_tokens, NULL, pipe_read_dup);
         printf("Checker 96 \n");
         exit(0);
     }
