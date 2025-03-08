@@ -496,12 +496,15 @@ void LaunchSinglePipe(char *line)
     printf("Check 3\n");
 
     // Forking Happens Here !
+    // This is still the Parent Prcoess
     LaunchFunction(left_tokens, input_file, -1);
+
     pid_t pid1 = fork();
-    printf("Check 4\n");
 
     if (pid1 == 0)
     {
+        printf("Check 44444\n");
+        LaunchFunction(left_tokens, input_file, -1);
         printf("Inside Child Process No 1 \n");
 
         printf("Check 11\n");
