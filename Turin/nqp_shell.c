@@ -514,7 +514,7 @@ void LaunchSinglePipe(char *line)
     if (pid2 == 0)
     {
         printf("Inside Child Process No 2 (Head Process)! \n");
-        dup2(pipe_fd[1], STDIN_FILENO);
+        dup2(pipe_fd[0], STDIN_FILENO);
         close(pipe_fd[0]);
         close(pipe_fd[1]);
         LaunchFunction(right_tokens, NULL, -1);
