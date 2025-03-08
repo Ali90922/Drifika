@@ -499,7 +499,8 @@ void LaunchSinglePipe(char *line)
     printf("Check 4\n");
     if (pid1 == 0)
     {
-        printf("Check 5\n");
+        printf("Inside Child Process No 1 \n");
+
         if (input_file != NULL)
         {
             int in_fd = setup_input_redirection(input_file);
