@@ -527,17 +527,13 @@ void LaunchSinglePipe(char *line)
     pid_t pid2 = fork();
     if (pid2 == 0)
     {
-        printf("Inside Child Process No 2 ! \n");
+        printf("Inside Child Process No 2 (Head Process)! \n");
 
-        close(pipe_fd[1]);
-        printf("Checker 91 \n");
-        int pipe_read_dup = dup(pipe_fd[0]);
-        printf("Checker 92 \n");
+        dup2(pipe_fd[0], STDIN_FILENO);
         close(pipe_fd[0]);
+        close(pipe_fd[1]);
 
-        printf("Checker 93 \n");
-
-        LaunchFunction(right_tokens, NULL, pipe_read_dup);
+        LaunchFunction(right_tokens, NULL, -1);
         printf("Checker 96 \n");
         exit(0);
     }
