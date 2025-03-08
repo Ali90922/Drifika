@@ -504,7 +504,6 @@ void LaunchSinglePipe(char *line)
     if (pid1 == 0)
     {
         printf("Check 44444\n");
-        LaunchFunction(left_tokens, input_file, -1);
         dup2(pipe_fd[1], STDOUT_FILENO);
         close(pipe_fd[0]);
         close(pipe_fd[1]);
@@ -515,6 +514,10 @@ void LaunchSinglePipe(char *line)
     if (pid2 == 0)
     {
         printf("Inside Child Process No 2 (Head Process)! \n");
+        dup2(pipe_fd[1], STDIN_FILENO);
+        close(pipe_fd[0]);
+        close(pipe_fd[1]);
+        LaunchFunction(right_tokens, NULL, -1);
 
         exit(0);
     }
