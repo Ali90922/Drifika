@@ -1,7 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #define _GNU_SOURCE
 
-#include <fcntl.h> // For mkstemp, memfd_create
+#include <fcntl.h> // For mkstemp, memfd_create, fcntl
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
@@ -207,9 +207,8 @@ void handle_ls(void)
 
 /*
  * LaunchFunction: Runs the given command. If do_fork == 1, we fork and run
- * in the child. If do_fork == 0, we run (and exec) right here in this process.
- *
- * This change removes the "double fork" that broke pipelines.
+ * in the child. If do_fork == 0, we run (and exec) right here in this process
+ * (e.g. for pipeline children).
  */
 void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override, int do_fork)
 {
@@ -233,7 +232,19 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override, in
         fprintf(stderr, "Command %s not found\n", abs_path);
         return;
     }
-    printf("File Descriptor for command (%s) is : %d\n", abs_path, exec_fd);
+
+    /* === CRITICAL FIX: Force the command file descriptor above 2. === */
+    int new_fd = fcntl(exec_fd, F_DUPFD, 3); // guarantee FD >= 3
+    if (new_fd == -1)
+    {
+        perror("fcntl(F_DUPFD) failed");
+        close(exec_fd);
+        return;
+    }
+    close(exec_fd);
+    exec_fd = new_fd;
+
+    printf("File Descriptor for command (%s) is now : %d\n", abs_path, exec_fd);
 
     // Create an in-memory file to copy the command
     int InMemoryFile = memfd_create("In-Memory-File", MFD_CLOEXEC);
@@ -294,10 +305,6 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override, in
 
     /* For non-pipe scenarios (or if not dealing with "head"/"tail" in a pipe),
        call fix_file_args to handle the extra file arguments. */
-    // We'll do a quick check: if cmd_argv[0] is "head" or "tail" and we are
-    // using a pipe, the user specifically wanted to skip fix_file_args, so skip.
-    // Else we do fix_file_args.
-    // But if you're sure you never want to skip, remove the condition:
     if (strcmp(cmd_argv[0], "head") != 0 && strcmp(cmd_argv[0], "tail") != 0)
     {
         fix_file_args(cmd_argv);
@@ -305,10 +312,10 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override, in
 
     /*
      * Now we either fork and exec, or just exec, depending on do_fork.
-     * If do_fork == 1 (normal single command):
-     *    we fork so the shell can continue after the command finishes.
-     * If do_fork == 0 (pipeline child):
-     *    we are already in a forked child. Just do the exec inline.
+     *  - If do_fork == 1 (normal single command): we fork so the shell can
+     *    continue after the command finishes.
+     *  - If do_fork == 0 (pipeline child): we are already in a child,
+     *    so we just exec right here without a second fork.
      */
     if (do_fork)
     {
@@ -399,12 +406,6 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override, in
             else
             {
                 // ELF (or other) => fexecve directly
-                // Set up input redirection if needed
-                if (input_file != NULL || input_fd_override != -1)
-                {
-                    // We already did this above, so nothing else to do.
-                }
-                // chdir to 'cwd' so relative paths match
                 if (chdir(cwd) == -1)
                 {
                     perror("chdir");
@@ -522,9 +523,7 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override, in
     }
 }
 
-/* LaunchSinglePipe: now we do exactly one fork for the left command,
- * and one fork for the right command. No "inner" forks in LaunchFunction!
- */
+/* LaunchSinglePipe: now we do exactly one fork for each side of the pipe. */
 void LaunchSinglePipe(char *line)
 {
     char *saveptr;
@@ -586,7 +585,6 @@ void LaunchSinglePipe(char *line)
         return;
     }
     printf("Check 2\n");
-
     printf("Check 3\n");
 
     /* Fork for left side */
@@ -599,9 +597,8 @@ void LaunchSinglePipe(char *line)
         close(pipe_fd[0]);
         close(pipe_fd[1]);
 
-        // Run left command in *this* process (no second fork!)
+        // Run left command in *this* process
         LaunchFunction(left_tokens, input_file, -1, /*do_fork=*/0);
-        // If exec fails, exit
         _exit(1);
     }
 
