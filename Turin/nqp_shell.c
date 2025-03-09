@@ -66,6 +66,18 @@ void shell_write_buf(const char *buf, ssize_t n)
     }
 }
 
+/* -----------------------------------------------------------------------
+ * Built-in: clear the screen
+ * ----------------------------------------------------------------------- */
+void handle_clear(void)
+{
+    /* Typical ANSI escape codes to move cursor home and clear screen */
+    /* \033[H  => move cursor to top-left
+       \033[2J => clear entire screen
+    */
+    shell_write("\033[H\033[2J");
+}
+
 /* ============================================================================
  * Built-in commands
  * ============================================================================
@@ -723,6 +735,12 @@ int main_pipe(int argc, char *argv[], char *envp[])
         else if (strcmp(tokens[0], "cd") == 0)
         {
             handle_cd(tokens[1]);
+            free(line);
+            continue;
+        }
+        else if (strcmp(tokens[0], "clear") == 0)
+        {
+            handle_clear();
             free(line);
             continue;
         }
