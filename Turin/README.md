@@ -28,7 +28,7 @@ To Enable Logging
 Features
 
 ### Built-in Commands
-cd <dir> - Change the current working directory. <br>
+cd directory - Change the current working directory. <br>
 pwd - Print the current working directory. <br>
 ls - List the contents of the current directory.<br>
 clear - Clears the terminal screen.<br>
