@@ -411,12 +411,15 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         close(new_stdin_fd);
     }
 
-    /* Switch child’s working directory to match the shell. */
-    if (chdir(cwd) == -1)
-    {
-        perror("chdir");
-        _exit(1);
-    }
+    /*
+     * IMPORTANT: Remove the real chdir(cwd).
+     *
+     * // if (chdir(cwd) == -1)
+     * // {
+     * //     perror("chdir");
+     * //     _exit(1);
+     * // }
+     */
 
     /* If #! script => copy to temp file and execve. Otherwise fexecve. */
     if (debug_header[0] == '#' && debug_header[1] == '!')
