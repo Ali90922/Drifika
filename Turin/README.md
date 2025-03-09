@@ -1,71 +1,45 @@
----
-title: COMP 3430 Operating Systems
-subtitle: "Assignment 2: shell!"
-date: Winter 2025
----
+# NQP Shell - COMP 3430 Assignment 2
 
-Overview
-========
+## Description
+This project implements an interactive shell (`nqp_shell`) for an exFAT-formatted volume, using the Not Quite POSIX (NQP) API. The shell supports built-in commands, launching processes, input redirection, pipes, and logging.
 
-This directory contains the following:
-
-* This `README.md` file (you're reading it!).
-* A `Makefile` that can build the sample code.
-* A generic, POSIX-like interface for opening and reading files in a file system
-  (`nqp_io.h`).
-* A pre-compiled implementation of this interface (`nqp_exfat.o`).
-* A sample exFAT-formatted volume containing some files and programs
-  (`root.img`).
-* An initial template implementation of a shell that works with the provided
-  volume.
-
-Building and running
-====================
-
-The only runnable program in this directory is `nqp_shell.c`.
-
-You can compile this program on the command line:
-
-```bash
+## Compilation
+To compile the shell, run:
+```sh
 make
-```
+'''
 
-You can run this program on the command line by passing the volume that you
-would like to have the shell use as a root directory:
+To start the shell with a volume 
 
-```bash
+```sh
 ./nqp_shell root.img
-```
+'''
 
-`nqp_exfat.o`
--------------
+To Enable Logging 
 
-This is a pre-compiled implementation of the interface defined in `nqp_io.h`.
-The file was compiled on Aviary. This *may* work on other x86_64 Linux
-installations (e.g., Windows Subsystem for Linux) but will not work on macOS
-(neither Intel nor Apple Silicon).
+```sh
+./nqp_shell root.img -o log.txt
+'''
 
-### macOS and Lima
 
-This *may* work in something like Lima, assuming that you are [running an x86_64
-version of Linux within Lima].
+Features
 
-This repository also now contains an arm-compiled version of the repository.
+Built-in Commands
+cd <dir> - Change the current working directory.
+pwd - Print the current working directory.
+ls - List the contents of the current directory.
+clear - Clears the terminal screen.
+Process Execution
+Runs programs stored in the provided volume.
+Uses memfd_create and fexecve to execute programs from the volume.
+Input Redirection
+Redirects input from a file using < filename.
+Reads the file into a memory-backed file (memfd_create).
+Sets up input redirection using dup2.
+Piping
+Supports multiple pipes (e.g., cat file.txt | grep hi | sort).
+Connects processes using pipe and dup2.
+Logging
+Duplicates shell output to log.txt when run with the -o option.
+Intercepts and logs the final process output in a pipeline.
 
-To build with the arm version, you'll have to specify a variable when you run
-`make`:
-
-```bash
-make NQP_EXFAT=nqp_exfat_arm.o
-```
-
-[running an x86_64 version of Linux within Lima]: https://github.com/lima-vm/lima/discussions/1797
-
-Using your own implementation
------------------------------
-
-If you would like to use your own implementation of exFAT for `nqp_io.h`, you
-will need to implement one additional function. You are welcome to implement
-the function on your own (it's called `nqp_vol_label`); this function should
-read the volume label directory entry from the root directory, pass that to
-`unicode2ascii`, and then return the string returned by `unicode2ascii`.
