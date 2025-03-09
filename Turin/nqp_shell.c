@@ -96,23 +96,42 @@ void handle_cd(char *dir)
         fprintf(stderr, "cd: missing argument\n");
         return;
     }
+
+    /* Handle "cd .." */
     if (strcmp(dir, "..") == 0)
     {
+        /* If already at root, do nothing */
         if (strcmp(cwd, "/") == 0)
             return;
+
         char *last_slash = strrchr(cwd, '/');
+        if (!last_slash)
+        {
+            /* Safety: if somehow cwd doesn't contain '/', report error */
+            fprintf(stderr, "cd: cwd is invalid (missing slash)\n");
+            return;
+        }
+
+        /* If the only slash is at the start => new cwd is "/" */
         if (last_slash == cwd)
+        {
             strcpy(cwd, "/");
+        }
         else
+        {
+            /* Truncate at the last slash */
             *last_slash = '\0';
+        }
         return;
     }
+
     /* Build a path from cwd + dir if dir is not absolute. */
     char path_copy[256];
     if (dir[0] != '/')
     {
+        /* Make sure we always end up with a leading slash if we were at "/" */
         if (strcmp(cwd, "/") == 0)
-            snprintf(path_copy, sizeof(path_copy), "%s", dir);
+            snprintf(path_copy, sizeof(path_copy), "/%s", dir);
         else
             snprintf(path_copy, sizeof(path_copy), "%s/%s", cwd, dir);
     }
@@ -121,10 +140,16 @@ void handle_cd(char *dir)
         strncpy(path_copy, dir, sizeof(path_copy));
         path_copy[sizeof(path_copy) - 1] = '\0';
     }
+
+    /* Try opening via NQP to confirm it exists/is valid */
     if (nqp_open(path_copy) != -1)
+    {
         strcpy(cwd, path_copy);
+    }
     else
+    {
         fprintf(stderr, "Directory %s not found\n", path_copy);
+    }
 }
 
 void handle_ls(void)
