@@ -42,7 +42,9 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override) __
 int setup_input_redirection(const char *filename);
 void fix_file_args(char **cmd_argv);
 
-/* Logging (duplicate output to both stdout and log file) */
+/* -----------------------------------------------------------------------
+ * Logging (duplicate output to both stdout and log file, if open)
+ * ----------------------------------------------------------------------- */
 void shell_write(const char *str)
 {
     write(STDOUT_FILENO, str, strlen(str));
@@ -54,21 +56,22 @@ void shell_write(const char *str)
 
 void shell_write_buf(const char *buf, ssize_t n)
 {
-    if (n <= 0)
-        return;
-    write(STDOUT_FILENO, buf, n);
-    if (log_fd >= 0)
+    if (n > 0)
     {
-        write(log_fd, buf, n);
+        write(STDOUT_FILENO, buf, n);
+        if (log_fd >= 0)
+        {
+            write(log_fd, buf, n);
+        }
     }
 }
 
 /* ============================================================================
-   Built-in commands
-   ============================================================================ */
+ * Built-in commands
+ * ============================================================================
+ */
 void handle_pwd(void)
 {
-    /* Print the current working directory. */
     char buf[512];
     snprintf(buf, sizeof(buf), "%s\n", cwd);
     shell_write(buf);
@@ -121,7 +124,7 @@ void handle_ls(void)
         fprintf(stderr, "%s not found\n", cwd);
         return;
     }
-    /* read entries via nqp_getdents */
+
     ssize_t dirents_read;
     while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
     {
@@ -141,10 +144,11 @@ void handle_ls(void)
 }
 
 /* ============================================================================
-   fix_file_args: For each argument that is actually an existing nqp file, we
-   copy it out to a /tmp file on the host so the child process can open it.
-   (Used by commands like: `myprogram some_nqp_file`.)
-   ============================================================================ */
+ * fix_file_args: For each argument that is actually an existing nqp file, we
+ * copy it out to a /tmp file on the host so the child process can open it.
+ * (Used by commands like: `myprogram some_nqp_file`.)
+ * ============================================================================
+ */
 void fix_file_args(char **cmd_argv)
 {
     for (int i = 1; cmd_argv[i] != NULL; i++)
@@ -196,9 +200,10 @@ void fix_file_args(char **cmd_argv)
 }
 
 /* ============================================================================
-   setup_input_redirection: Copy an nqp file into a memfd so we can read it.
-   Then return that memfd FD. Or -1 on error.
-   ============================================================================ */
+ * setup_input_redirection: Copy an nqp file into a memfd so we can read it.
+ * Then return that memfd FD. Or -1 on error.
+ * ============================================================================
+ */
 int setup_input_redirection(const char *filename)
 {
     char input_abs[MAX_LINE_SIZE];
@@ -214,6 +219,7 @@ int setup_input_redirection(const char *filename)
         strncpy(input_abs, filename, sizeof(input_abs));
         input_abs[sizeof(input_abs) - 1] = '\0';
     }
+
     int fd = nqp_open(input_abs);
     if (fd == NQP_FILE_NOT_FOUND)
     {
@@ -259,15 +265,16 @@ int setup_input_redirection(const char *filename)
 }
 
 /* ============================================================================
-   LaunchFunction: In this child process, sets up input redirection (if any),
-   fixes file args (if not in pipeline for head/tail), then does an exec
-   by copying the NQP file into a memfd, checking if it's #! or ELF, etc.
-
-   This function never returns (calls _exit on error or after exec).
-   ============================================================================ */
+ * LaunchFunction: In this child process, sets up input redirection (if any),
+ * fixes file args (if not in pipeline for head/tail), then does an exec
+ * by copying the NQP file into a memfd, checking if it's #! or ELF, etc.
+ *
+ * This function never returns (calls _exit on error or after exec).
+ * ============================================================================
+ */
 void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
 {
-    int exec_fd = 0;
+    int exec_fd;
     char abs_path[MAX_LINE_SIZE];
 
     /* Build absolute path for the command from the current directory. */
@@ -426,9 +433,10 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
 }
 
 /* ============================================================================
-   LaunchPipeline: handle multiple subcommands separated by '|'.
-   This supports any number of pipes, not just one.
-   ============================================================================ */
+ * LaunchPipeline: handle multiple subcommands separated by '|'.
+ * This supports any number of pipes, not just one.
+ * ============================================================================
+ */
 void LaunchPipeline(char *line)
 {
     pipeline_mode = 1;
@@ -551,6 +559,7 @@ void LaunchPipeline(char *line)
                     dup2(final_pipe[1], STDOUT_FILENO);
                 }
             }
+
             /* close all pipe FDs not needed in child */
             for (int j = 0; j < num_cmds - 1; j++)
             {
@@ -584,7 +593,8 @@ void LaunchPipeline(char *line)
         close(final_pipe[1]); /* we read from final_pipe[0] */
     }
 
-    /* Wait for all but last child, or do concurrency. Here we’ll just do normal waits in order. */
+    /* Wait for all but last child, or do concurrency.
+       We'll just wait in order here. */
     for (int i = 0; i < num_cmds - 1; i++)
     {
         waitpid(pids[i], NULL, 0);
@@ -609,9 +619,10 @@ void LaunchPipeline(char *line)
 }
 
 /* ============================================================================
-   The main shell loop (single command or pipeline).
-   If user runs: ./nqp_shell volume.img -o log.txt, we set log_fd accordingly.
-   ============================================================================ */
+ * The main shell loop (single command or pipeline).
+ * If user runs: ./nqp_shell volume.img -o log.txt, we set log_fd accordingly.
+ * ============================================================================
+ */
 int main_pipe(int argc, char *argv[], char *envp[])
 {
     (void)envp; // unused
@@ -649,7 +660,7 @@ int main_pipe(int argc, char *argv[], char *envp[])
         snprintf(prompt, sizeof(prompt), "%s:\\> ", cwd);
         shell_write(prompt);
 
-        /* Read line with readline (no built-in prompt) */
+        /* Read line with readline (we supply our prompt manually) */
         char *line = readline("");
         if (!line)
         {
@@ -770,7 +781,7 @@ int main_pipe(int argc, char *argv[], char *envp[])
             }
             if (pid == 0)
             {
-                /* child => write to final_pipe[1] => parent duplicates to log & stdout */
+                /* child => write to final_pipe[1], then LaunchFunction. */
                 dup2(final_pipe[1], STDOUT_FILENO);
                 close(final_pipe[0]);
                 close(final_pipe[1]);
@@ -813,6 +824,7 @@ int main_pipe(int argc, char *argv[], char *envp[])
         free(line);
     }
 
+    /* Unmount or close log file if needed */
     if (log_fd >= 0)
         close(log_fd);
 
