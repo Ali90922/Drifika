@@ -42,9 +42,6 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override) __
 int setup_input_redirection(const char *filename);
 void fix_file_args(char **cmd_argv);
 
-/* -----------------------------------------------------------------------
- * Logging (duplicate output to both stdout and log file, if open)
- * ----------------------------------------------------------------------- */
 void shell_write(const char *str)
 {
     write(STDOUT_FILENO, str, strlen(str));
@@ -66,9 +63,7 @@ void shell_write_buf(const char *buf, ssize_t n)
     }
 }
 
-/* -----------------------------------------------------------------------
- * Built-in: clear the screen
- * ----------------------------------------------------------------------- */
+//* Built-in: clear the screen
 void handle_clear(void)
 {
     /* Typical ANSI escape codes to move cursor home and clear screen */
@@ -612,7 +607,6 @@ void LaunchPipeline(char *line)
                 close(final_pipe[1]);
             }
 
-            /* LaunchFunction never returns. */
             LaunchFunction(cmd_argvs[i], input_files[i], -1);
         }
         else
@@ -660,7 +654,7 @@ void LaunchPipeline(char *line)
 
 /* ============================================================================
  * The main shell loop (single command or pipeline).
- * If user runs: ./nqp_shell volume.img -o log.txt, we set log_fd accordingly.
+ * If user runs: ./nqp_shell volume.img -o log.txt
  * ============================================================================
  */
 int main_pipe(int argc, char *argv[], char *envp[])
@@ -882,3 +876,4 @@ int main(int argc, char *argv[], char *envp[])
 {
     return main_pipe(argc, argv, envp);
 }
+
