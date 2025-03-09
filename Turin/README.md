@@ -47,6 +47,14 @@ Sets up input redirection using dup2.   <br>
 Supports multiple pipes (e.g., cat file.txt | grep hi | sort).   <br>
 Connects processes using pipe and dup2.  <br>
 
+ie : <br>
+/:\> cat < hellos.txt | head -4  <br>
+hi!<br>
+hello!<br>
+bonjour!<br>
+greetings!<br>
+
+
 ### Logging
 Duplicates shell output to log.txt when run with the -o option. <br>
 Intercepts and logs the final process output in a pipeline.
