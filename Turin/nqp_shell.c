@@ -3,78 +3,148 @@
 
 #include <fcntl.h> // For mkstemp, memfd_create
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "nqp_io.h"
-#include <sys/stat.h>
 #include <errno.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
+/* The NQP library headers (exfat, etc.) */
+#include "nqp_io.h"
+
 #define BUFFER_SIZE 1024
 #define MAX_LINE_SIZE 256
 #define MAX_ARGS 20
+#define MAX_CMDS 20 /* Maximum number of subcommands in a pipeline */
 
-/* Global current working directory */
+/* Globals */
 char cwd[MAX_LINE_SIZE] = "/";
-
-/* Global flag: set to 1 when executing a pipeline */
-int pipeline_mode = 0;
+int pipeline_mode = 0;  /* set to 1 when processing a pipeline */
+static int log_fd = -1; /* -1 => no logging */
 
 /* We'll need this to inherit the parent's environment for execve. */
 extern char **environ;
 
-/* Global log file descriptor, -1 if not logging. */
-static int log_fd = -1;
-
-/* Forward declarations */
+/* Forward declarations for built-ins */
 void handle_cd(char *dir);
 void handle_pwd(void);
 void handle_ls(void);
 
-/* We do not fork in LaunchFunction; it *execs* in this process. */
+/* The main “exec in child” logic (no return). */
 void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override) __attribute__((noreturn));
 
-void LaunchSinglePipe(char *line);
+/* Helpers for input redirection & file-arg substitution. */
 int setup_input_redirection(const char *filename);
 void fix_file_args(char **cmd_argv);
 
-/* ------------------------------------------------------------------
-   Helper: if we're logging, also write to log_fd.
-   If not, just write to stdout.
-   You can do fputs or write directly. Here we do a simple approach.
-   ------------------------------------------------------------------ */
+/* Logging (duplicate output to both stdout and log file) */
 void shell_write(const char *str)
 {
-    /* Always write to stdout: */
     write(STDOUT_FILENO, str, strlen(str));
-
-    /* Also write to log if enabled: */
     if (log_fd >= 0)
     {
         write(log_fd, str, strlen(str));
     }
 }
 
-/* This version writes a buffer of arbitrary length (for piping child’s output). */
 void shell_write_buf(const char *buf, ssize_t n)
 {
     if (n <= 0)
         return;
-    /* stdout */
     write(STDOUT_FILENO, buf, n);
-    /* log file if open */
     if (log_fd >= 0)
     {
         write(log_fd, buf, n);
     }
 }
 
-/* fix_file_args implementation unchanged... */
+/* ============================================================================
+   Built-in commands
+   ============================================================================ */
+void handle_pwd(void)
+{
+    /* Print the current working directory. */
+    char buf[512];
+    snprintf(buf, sizeof(buf), "%s\n", cwd);
+    shell_write(buf);
+}
+
+void handle_cd(char *dir)
+{
+    if (!dir)
+    {
+        fprintf(stderr, "cd: missing argument\n");
+        return;
+    }
+    if (strcmp(dir, "..") == 0)
+    {
+        if (strcmp(cwd, "/") == 0)
+            return;
+        char *last_slash = strrchr(cwd, '/');
+        if (last_slash == cwd)
+            strcpy(cwd, "/");
+        else
+            *last_slash = '\0';
+        return;
+    }
+    /* Build a path from cwd + dir if dir is not absolute. */
+    char path_copy[256];
+    if (dir[0] != '/')
+    {
+        if (strcmp(cwd, "/") == 0)
+            snprintf(path_copy, sizeof(path_copy), "%s", dir);
+        else
+            snprintf(path_copy, sizeof(path_copy), "%s/%s", cwd, dir);
+    }
+    else
+    {
+        strncpy(path_copy, dir, sizeof(path_copy));
+        path_copy[sizeof(path_copy) - 1] = '\0';
+    }
+    if (nqp_open(path_copy) != -1)
+        strcpy(cwd, path_copy);
+    else
+        fprintf(stderr, "Directory %s not found\n", path_copy);
+}
+
+void handle_ls(void)
+{
+    nqp_dirent entry = {0};
+    int fd = nqp_open(cwd);
+    if (fd == NQP_FILE_NOT_FOUND)
+    {
+        fprintf(stderr, "%s not found\n", cwd);
+        return;
+    }
+    /* read entries via nqp_getdents */
+    ssize_t dirents_read;
+    while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
+    {
+        char buf[512];
+        snprintf(buf, sizeof(buf), "%lu %s", entry.inode_number, entry.name);
+        if (entry.type == DT_DIR)
+            strncat(buf, "/", sizeof(buf) - strlen(buf) - 1);
+        strncat(buf, "\n", sizeof(buf) - strlen(buf) - 1);
+        shell_write(buf);
+
+        free(entry.name);
+    }
+    if (dirents_read == -1)
+        fprintf(stderr, "%s is not a directory\n", cwd);
+
+    nqp_close(fd);
+}
+
+/* ============================================================================
+   fix_file_args: For each argument that is actually an existing nqp file, we
+   copy it out to a /tmp file on the host so the child process can open it.
+   (Used by commands like: `myprogram some_nqp_file`.)
+   ============================================================================ */
 void fix_file_args(char **cmd_argv)
 {
     for (int i = 1; cmd_argv[i] != NULL; i++)
@@ -90,7 +160,9 @@ void fix_file_args(char **cmd_argv)
         else
         {
             strncpy(abs_path, cmd_argv[i], sizeof(abs_path));
+            abs_path[sizeof(abs_path) - 1] = '\0';
         }
+
         int fd = nqp_open(abs_path);
         if (fd != NQP_FILE_NOT_FOUND)
         {
@@ -102,6 +174,7 @@ void fix_file_args(char **cmd_argv)
                 close(fd);
                 continue;
             }
+            /* Copy file contents from nqp to tmp. */
             ssize_t r, w;
             char buf[BUFFER_SIZE];
             while ((r = nqp_read(fd, buf, BUFFER_SIZE)) > 0)
@@ -115,12 +188,17 @@ void fix_file_args(char **cmd_argv)
             }
             close(tmp_fd);
             nqp_close(fd);
+
+            /* Replace the argument with the new /tmp filename. */
             cmd_argv[i] = strdup(tmp_template);
         }
     }
 }
 
-/* setup_input_redirection implementation unchanged... */
+/* ============================================================================
+   setup_input_redirection: Copy an nqp file into a memfd so we can read it.
+   Then return that memfd FD. Or -1 on error.
+   ============================================================================ */
 int setup_input_redirection(const char *filename)
 {
     char input_abs[MAX_LINE_SIZE];
@@ -134,6 +212,7 @@ int setup_input_redirection(const char *filename)
     else
     {
         strncpy(input_abs, filename, sizeof(input_abs));
+        input_abs[sizeof(input_abs) - 1] = '\0';
     }
     int fd = nqp_open(input_abs);
     if (fd == NQP_FILE_NOT_FOUND)
@@ -169,6 +248,7 @@ int setup_input_redirection(const char *filename)
         return -1;
     }
     nqp_close(fd);
+
     if (lseek(memfd_in, 0, SEEK_SET) == -1)
     {
         perror("lseek on input memfd");
@@ -178,108 +258,25 @@ int setup_input_redirection(const char *filename)
     return memfd_in;
 }
 
-/* handle_pwd: Print the current working directory */
-void handle_pwd(void)
-{
-    /* Print it with shell_write so it goes to log if needed. */
-    char buf[512];
-    snprintf(buf, sizeof(buf), "%s\n", cwd);
-    shell_write(buf);
-}
+/* ============================================================================
+   LaunchFunction: In this child process, sets up input redirection (if any),
+   fixes file args (if not in pipeline for head/tail), then does an exec
+   by copying the NQP file into a memfd, checking if it's #! or ELF, etc.
 
-/* handle_cd: Change directory; supports "cd .." */
-void handle_cd(char *dir)
-{
-    if (dir == NULL)
-    {
-        fprintf(stderr, "cd: missing argument\n");
-        return;
-    }
-    if (strcmp(dir, "..") == 0)
-    {
-        if (strcmp(cwd, "/") == 0)
-            return;
-        char *last_slash = strrchr(cwd, '/');
-        if (last_slash == cwd)
-            strcpy(cwd, "/");
-        else
-            *last_slash = '\0';
-        return;
-    }
-    char path_copy[256];
-    if (dir[0] != '/')
-    {
-        if (strcmp(cwd, "/") == 0)
-            snprintf(path_copy, sizeof(path_copy), "%s", dir);
-        else
-            snprintf(path_copy, sizeof(path_copy), "%s/%s", cwd, dir);
-    }
-    else
-    {
-        strncpy(path_copy, dir, sizeof(path_copy));
-    }
-    if (nqp_open(path_copy) != -1)
-        strcpy(cwd, path_copy);
-    else
-        fprintf(stderr, "Directory %s not found\n", path_copy);
-}
-
-/* handle_ls: List the contents of the current directory */
-void handle_ls(void)
-{
-    nqp_dirent entry = {0};
-    int fd;
-    ssize_t dirents_read;
-    fd = nqp_open(cwd);
-    if (fd == NQP_FILE_NOT_FOUND)
-    {
-        fprintf(stderr, "%s not found\n", cwd);
-    }
-    else
-    {
-        while ((dirents_read = nqp_getdents(fd, &entry, 1)) > 0)
-        {
-            /* Let’s write to stdout normally here or with shell_write? */
-            char buf[512];
-            snprintf(buf, sizeof(buf), "%lu %s", entry.inode_number, entry.name);
-            if (entry.type == DT_DIR)
-                strncat(buf, "/", sizeof(buf) - strlen(buf) - 1);
-            strncat(buf, "\n", sizeof(buf) - strlen(buf) - 1);
-            shell_write(buf);
-
-            free(entry.name);
-        }
-        if (dirents_read == -1)
-            fprintf(stderr, "%s is not a directory\n", cwd);
-        nqp_close(fd);
-    }
-}
-
-/* ---------------------------------------------------------------------
-   LaunchFunction: This now never returns, it eventually calls exit()
-   (like exec) so we can be in the same child that has STDOUT/STDIN set up.
-
-   Because we do a second fork, though, this code is the old logic that
-   double-forks. We'll fix that by removing the fork from inside here.
-
-   => We'll make this function a "no return", so it calls _exit in errors
-      or does exec/fexecve at the end. The shell must do 1 fork for each
-      command it wants to run. This child calls LaunchFunction.
-   --------------------------------------------------------------------- */
+   This function never returns (calls _exit on error or after exec).
+   ============================================================================ */
 void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
 {
-    /* Instead of forking again, we do the logic directly
-       and then exec. On error, call _exit(1) or so. */
-
     int exec_fd = 0;
     char abs_path[MAX_LINE_SIZE];
 
+    /* Build absolute path for the command from the current directory. */
     if (strcmp(cwd, "/") == 0)
         snprintf(abs_path, sizeof(abs_path), "%s", cmd_argv[0]);
     else
         snprintf(abs_path, sizeof(abs_path), "%s/%s", cwd, cmd_argv[0]);
 
-    /* Special-case: if the command name starts with "._", skip the "._" */
+    /* If the command starts with "._", skip that part. */
     if (strncmp(cmd_argv[0], "._", 2) == 0)
         cmd_argv[0] += 2;
 
@@ -289,6 +286,7 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         fprintf(stderr, "Command %s not found\n", abs_path);
         _exit(127);
     }
+
     /* Copy the command into a memfd so we can fexecve or handle #!. */
     int InMemoryFile = memfd_create("In-Memory-File", MFD_CLOEXEC);
     if (InMemoryFile == -1)
@@ -297,6 +295,7 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         _exit(1);
     }
 
+    /* Copy the file contents from nqp into the memfd. */
     ssize_t bytes_read, bytes_written;
     char buffer[BUFFER_SIZE];
     while ((bytes_read = nqp_read(exec_fd, buffer, BUFFER_SIZE)) > 0)
@@ -339,14 +338,14 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         _exit(1);
     }
 
-    /* If not in pipeline for head/tail, fix file args: */
+    /* If not in pipeline for head/tail, fix file args. */
     if (!(pipeline_mode && (strcmp(cmd_argv[0], "head") == 0 ||
                             strcmp(cmd_argv[0], "tail") == 0)))
     {
         fix_file_args(cmd_argv);
     }
 
-    /* Setup input redirection in this child if needed. */
+    /* Input redirection if needed. */
     if (input_file != NULL || input_fd_override != -1)
     {
         int new_stdin_fd;
@@ -368,16 +367,17 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
         close(new_stdin_fd);
     }
 
-    /* Also, chdir to our shell's working directory. */
+    /* Switch child’s working directory to match the shell. */
     if (chdir(cwd) == -1)
     {
         perror("chdir");
         _exit(1);
     }
 
-    /* #! => copy to a temp file, execve that. Otherwise fexecve. */
+    /* If #! script => copy to temp file and execve. Otherwise fexecve. */
     if (debug_header[0] == '#' && debug_header[1] == '!')
     {
+        /* Shell script. Copy in-memory file to a /tmp script, then execve. */
         char tmp_template[] = "/tmp/scriptXXXXXX";
         int tmp_fd = mkstemp(tmp_template);
         if (tmp_fd == -1)
@@ -425,154 +425,174 @@ void LaunchFunction(char **cmd_argv, char *input_file, int input_fd_override)
     _exit(1);
 }
 
-/* LaunchSinglePipe:
-   Now that we only handle "one pipe," we do:
-   - create pipe for left->right
-   - if logging is on, we also intercept the right's final output in another pipe
-*/
-void LaunchSinglePipe(char *line)
+/* ============================================================================
+   LaunchPipeline: handle multiple subcommands separated by '|'.
+   This supports any number of pipes, not just one.
+   ============================================================================ */
+void LaunchPipeline(char *line)
 {
-    char *saveptr;
-    char *left_str = strtok_r(line, "|", &saveptr);
-    char *right_str = strtok_r(NULL, "|", &saveptr);
-
-    if (!left_str || !right_str)
-    {
-        fprintf(stderr, "Syntax error: expected two commands separated by a pipe\n");
-        return;
-    }
-
-    /* Parse left side for optional < redirection */
-    char *left_tokens[MAX_ARGS];
-    int left_argc = 0;
-    char *input_file = NULL;
-    char *saveptr_left;
-    char *token = strtok_r(left_str, " ", &saveptr_left);
-    while (token && left_argc < MAX_ARGS - 1)
-    {
-        if (strcmp(token, "<") == 0)
-        {
-            token = strtok_r(NULL, " ", &saveptr_left);
-            if (!token)
-            {
-                fprintf(stderr, "Syntax error: no input file specified\n");
-                return;
-            }
-            input_file = strdup(token);
-        }
-        else
-        {
-            left_tokens[left_argc++] = strdup(token);
-        }
-        token = strtok_r(NULL, " ", &saveptr_left);
-    }
-    left_tokens[left_argc] = NULL;
-
-    /* Parse right side */
-    char *right_tokens[MAX_ARGS];
-    int right_argc = 0;
-    char *saveptr_right;
-    token = strtok_r(right_str, " ", &saveptr_right);
-    while (token && right_argc < MAX_ARGS - 1)
-    {
-        right_tokens[right_argc++] = strdup(token);
-        token = strtok_r(NULL, " ", &saveptr_right);
-    }
-    right_tokens[right_argc] = NULL;
-
-    /* Pipe for left->right */
-    int pipe_fd[2];
-    if (pipe(pipe_fd) == -1)
-    {
-        perror("pipe (left->right)");
-        return;
-    }
-
     pipeline_mode = 1;
 
-    /* Fork child for left side */
-    pid_t pid_left = fork();
-    if (pid_left < 0)
+    /* Split on '|' into up to MAX_CMDS subcommands. */
+    char *cmd_strings[MAX_CMDS];
+    memset(cmd_strings, 0, sizeof(cmd_strings));
+
+    int num_cmds = 0;
+    char *savep;
+    char *segment = strtok_r(line, "|", &savep);
+    while (segment && num_cmds < MAX_CMDS)
     {
-        perror("fork (left)");
-        close(pipe_fd[0]);
-        close(pipe_fd[1]);
+        cmd_strings[num_cmds++] = segment;
+        segment = strtok_r(NULL, "|", &savep);
+    }
+    if (num_cmds < 1)
+    {
+        fprintf(stderr, "No commands found in pipeline.\n");
         pipeline_mode = 0;
         return;
     }
-    if (pid_left == 0)
+
+    /* For each subcommand, parse tokens (look for <). */
+    char *cmd_argvs[MAX_CMDS][MAX_ARGS];
+    char *input_files[MAX_CMDS];
+    memset(cmd_argvs, 0, sizeof(cmd_argvs));
+    memset(input_files, 0, sizeof(input_files));
+
+    for (int i = 0; i < num_cmds; i++)
     {
-        /* in left child: write to pipe_fd[1] => STDOUT */
-        dup2(pipe_fd[1], STDOUT_FILENO);
-        close(pipe_fd[0]);
-        close(pipe_fd[1]);
-        /* does not return */
-        LaunchFunction(left_tokens, input_file, -1);
+        char *sub_line = cmd_strings[i];
+        int token_count = 0;
+
+        char *savep_sub;
+        char *tok = strtok_r(sub_line, " ", &savep_sub);
+        while (tok && token_count < MAX_ARGS - 1)
+        {
+            if (strcmp(tok, "<") == 0)
+            {
+                tok = strtok_r(NULL, " ", &savep_sub);
+                if (!tok)
+                {
+                    fprintf(stderr, "Syntax error: no input file specified\n");
+                    pipeline_mode = 0;
+                    return;
+                }
+                input_files[i] = strdup(tok);
+            }
+            else
+            {
+                cmd_argvs[i][token_count++] = tok;
+            }
+            tok = strtok_r(NULL, " ", &savep_sub);
+        }
+        cmd_argvs[i][token_count] = NULL;
+
+        if (token_count == 0 && !input_files[i])
+        {
+            fprintf(stderr, "Empty command in pipeline?\n");
+            pipeline_mode = 0;
+            return;
+        }
     }
 
-    /* Next: the right side might be the final command. If log_fd >= 0,
-       we set up a second pipe from right->shell so we can intercept. */
+    /* Create (num_cmds - 1) pipes for the chain. */
+    int pipes[MAX_CMDS - 1][2];
+    for (int i = 0; i < num_cmds - 1; i++)
+    {
+        if (pipe(pipes[i]) == -1)
+        {
+            perror("pipe");
+            pipeline_mode = 0;
+            return;
+        }
+    }
+
+    /* Also create final pipe for logging if needed. */
     int final_pipe[2];
     int using_log_pipe = 0;
     if (log_fd >= 0)
     {
         if (pipe(final_pipe) == -1)
         {
-            perror("pipe (right->shell logging)");
-            close(pipe_fd[0]);
-            close(pipe_fd[1]);
-            waitpid(pid_left, NULL, 0);
+            perror("pipe (final logging)");
             pipeline_mode = 0;
             return;
         }
         using_log_pipe = 1;
     }
 
-    /* Fork child for right side */
-    pid_t pid_right = fork();
-    if (pid_right < 0)
+    pid_t pids[MAX_CMDS];
+    for (int i = 0; i < num_cmds; i++)
     {
-        perror("fork (right)");
-        close(pipe_fd[0]);
-        close(pipe_fd[1]);
-        if (using_log_pipe)
+        pid_t pid = fork();
+        if (pid < 0)
         {
-            close(final_pipe[0]);
-            close(final_pipe[1]);
+            perror("fork");
+            pipeline_mode = 0;
+            return;
         }
-        waitpid(pid_left, NULL, 0);
-        pipeline_mode = 0;
-        return;
+        if (pid == 0)
+        {
+            /* Child i */
+            if (i > 0)
+            {
+                /* read from pipes[i-1][0] => STDIN */
+                dup2(pipes[i - 1][0], STDIN_FILENO);
+            }
+            if (i < num_cmds - 1)
+            {
+                /* write to pipes[i][1] => STDOUT */
+                dup2(pipes[i][1], STDOUT_FILENO);
+            }
+            else
+            {
+                /* last command => if logging, write to final_pipe[1] */
+                if (using_log_pipe)
+                {
+                    dup2(final_pipe[1], STDOUT_FILENO);
+                }
+            }
+            /* close all pipe FDs not needed in child */
+            for (int j = 0; j < num_cmds - 1; j++)
+            {
+                close(pipes[j][0]);
+                close(pipes[j][1]);
+            }
+            if (using_log_pipe)
+            {
+                close(final_pipe[0]);
+                close(final_pipe[1]);
+            }
+
+            /* LaunchFunction never returns. */
+            LaunchFunction(cmd_argvs[i], input_files[i], -1);
+        }
+        else
+        {
+            /* parent */
+            pids[i] = pid;
+        }
     }
-    if (pid_right == 0)
+
+    /* Parent closes the chain pipes. */
+    for (int i = 0; i < num_cmds - 1; i++)
     {
-        /* in right child: read from pipe_fd[0] => STDIN */
-        dup2(pipe_fd[0], STDIN_FILENO);
-        close(pipe_fd[0]);
-        close(pipe_fd[1]);
-
-        if (using_log_pipe)
-        {
-            /* write final output to final_pipe[1] instead of stdout */
-            dup2(final_pipe[1], STDOUT_FILENO);
-            close(final_pipe[0]);
-            close(final_pipe[1]);
-        }
-        /* does not return */
-        LaunchFunction(right_tokens, NULL, -1);
+        close(pipes[i][0]);
+        close(pipes[i][1]);
     }
-
-    /* parent */
-    close(pipe_fd[0]);
-    close(pipe_fd[1]);
-
-    /* We can wait for left first, or do concurrency. Typically we just wait in order. */
-    waitpid(pid_left, NULL, 0);
-
     if (using_log_pipe)
     {
-        /* We must read from final_pipe[0] until EOF, writing everything to both stdout & log */
-        close(final_pipe[1]); // not used by parent
+        close(final_pipe[1]); /* we read from final_pipe[0] */
+    }
+
+    /* Wait for all but last child, or do concurrency. Here we’ll just do normal waits in order. */
+    for (int i = 0; i < num_cmds - 1; i++)
+    {
+        waitpid(pids[i], NULL, 0);
+    }
+
+    /* If logging, read from final_pipe[0] => shell_write_buf => logs+stdout. */
+    if (using_log_pipe)
+    {
         char buf[BUFFER_SIZE];
         ssize_t rcount;
         while ((rcount = read(final_pipe[0], buf, sizeof(buf))) > 0)
@@ -582,28 +602,29 @@ void LaunchSinglePipe(char *line)
         close(final_pipe[0]);
     }
 
-    waitpid(pid_right, NULL, 0);
+    /* Finally wait for the last child. */
+    waitpid(pids[num_cmds - 1], NULL, 0);
 
     pipeline_mode = 0;
 }
 
-/* main_pipe: Main loop for our one-pipe shell using readline */
+/* ============================================================================
+   The main shell loop (single command or pipeline).
+   If user runs: ./nqp_shell volume.img -o log.txt, we set log_fd accordingly.
+   ============================================================================ */
 int main_pipe(int argc, char *argv[], char *envp[])
 {
-    char *line = NULL;
-    (void)envp; // Unused for now
+    (void)envp; // unused
 
-    /* Check if we have the form: ./nqp_shell volume.img -o log.txt */
+    /* Check command-line for -o option. */
     if (argc == 4 && strcmp(argv[2], "-o") == 0)
     {
-        /* open log file */
         log_fd = open(argv[3], O_WRONLY | O_CREAT | O_TRUNC, 0666);
         if (log_fd < 0)
         {
             perror("open log file");
             exit(EXIT_FAILURE);
         }
-        /* do_log is implied by (log_fd >= 0) */
     }
     else if (argc != 2)
     {
@@ -611,6 +632,7 @@ int main_pipe(int argc, char *argv[], char *envp[])
         exit(EXIT_FAILURE);
     }
 
+    /* Mount the NQP volume. */
     nqp_error mount_error = nqp_mount(argv[1], NQP_FS_EXFAT);
     if (mount_error != NQP_OK)
     {
@@ -619,37 +641,40 @@ int main_pipe(int argc, char *argv[], char *envp[])
         exit(EXIT_FAILURE);
     }
 
+    /* Main read/execute loop */
     while (1)
     {
-        /* Build the prompt; use shell_write so it goes to log if needed. */
+        /* Show prompt */
         char prompt[MAX_LINE_SIZE];
         snprintf(prompt, sizeof(prompt), "%s:\\> ", cwd);
         shell_write(prompt);
 
-        /* Use readline purely to get user input, ignoring auto prompt prints. */
-        line = readline(""); /* pass empty prompt to readline, we do ours manually */
-        if (line == NULL)
+        /* Read line with readline (no built-in prompt) */
+        char *line = readline("");
+        if (!line)
         {
             shell_write("\nExiting shell...\n");
             break;
         }
         if (strlen(line) > 0)
             add_history(line);
+
+        /* If empty line, skip */
         if (strlen(line) == 0)
         {
             free(line);
             continue;
         }
 
-        /* Check for pipeline */
-        if (strchr(line, '|') != NULL)
+        /* Check for pipeline(s). If there's at least one '|', handle them. */
+        if (strchr(line, '|'))
         {
-            LaunchSinglePipe(line);
+            LaunchPipeline(line);
             free(line);
             continue;
         }
 
-        /* Otherwise single command. Possibly with <. Parse it. */
+        /* Otherwise single command. Possibly with < redirection. */
         char *tokens[MAX_ARGS];
         int token_count = 0;
         char *tok = strtok(line, " ");
@@ -665,7 +690,7 @@ int main_pipe(int argc, char *argv[], char *envp[])
             continue;
         }
 
-        /* Check for built-in commands */
+        /* Check built-in commands */
         if (strcmp(tokens[0], "exit") == 0)
         {
             shell_write("Exiting shell...\n");
@@ -691,7 +716,7 @@ int main_pipe(int argc, char *argv[], char *envp[])
             continue;
         }
 
-        /* Now parse for < input redirection. */
+        /* If not a built-in, parse for optional "< file". */
         char *cmd_argv[MAX_ARGS];
         int cmd_argc = 0;
         char *input_file = NULL;
@@ -717,26 +742,27 @@ int main_pipe(int argc, char *argv[], char *envp[])
             }
         }
         cmd_argv[cmd_argc] = NULL;
+
         if (cmd_argc == 0)
         {
             free(line);
             continue;
         }
 
-        /* If logging is enabled, we need to intercept the child's output in a pipe. */
+        /* If logging => capture child output in pipe so we can tee it to log. */
         if (log_fd >= 0)
         {
             int final_pipe[2];
             if (pipe(final_pipe) == -1)
             {
-                perror("pipe (single cmd->shell)");
+                perror("pipe");
                 free(line);
                 continue;
             }
             pid_t pid = fork();
             if (pid < 0)
             {
-                perror("fork");
+                perror("fork single cmd");
                 close(final_pipe[0]);
                 close(final_pipe[1]);
                 free(line);
@@ -744,7 +770,7 @@ int main_pipe(int argc, char *argv[], char *envp[])
             }
             if (pid == 0)
             {
-                /* child: redirect stdout to final_pipe[1] */
+                /* child => write to final_pipe[1] => parent duplicates to log & stdout */
                 dup2(final_pipe[1], STDOUT_FILENO);
                 close(final_pipe[0]);
                 close(final_pipe[1]);
@@ -752,7 +778,7 @@ int main_pipe(int argc, char *argv[], char *envp[])
             }
             else
             {
-                /* parent: read from final_pipe[0] => shell_write_buf => both stdout/log */
+                /* parent => read from final_pipe[0] */
                 close(final_pipe[1]);
                 char buf[BUFFER_SIZE];
                 ssize_t rcount;
@@ -766,17 +792,16 @@ int main_pipe(int argc, char *argv[], char *envp[])
         }
         else
         {
-            /* No logging, simpler: child writes directly to stdout. */
+            /* No logging => child writes directly to stdout. */
             pid_t pid = fork();
             if (pid < 0)
             {
-                perror("fork single cmd");
+                perror("fork single cmd no-log");
                 free(line);
                 continue;
             }
             if (pid == 0)
             {
-                /* child => direct stdout */
                 LaunchFunction(cmd_argv, input_file, -1);
             }
             else
@@ -788,13 +813,13 @@ int main_pipe(int argc, char *argv[], char *envp[])
         free(line);
     }
 
-    /* Cleanup */
     if (log_fd >= 0)
         close(log_fd);
 
     return EXIT_SUCCESS;
 }
 
+/* Standard main entry point */
 int main(int argc, char *argv[], char *envp[])
 {
     return main_pipe(argc, argv, envp);
