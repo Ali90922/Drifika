@@ -59,3 +59,6 @@ greetings!<br>
 Duplicates shell output to log.txt when run with the -o option. <br>
 Intercepts and logs the final process output in a pipeline.
 
+### Bonus <br>
+ Readline support added to my shell. Shell supports pressing the up arrow to see previous commands <br>
+
