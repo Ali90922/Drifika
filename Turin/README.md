@@ -33,17 +33,21 @@ pwd - Print the current working directory. <br>
 ls - List the contents of the current directory.<br>
 clear - Clears the terminal screen.<br>
 
-###Process Execution<br>
+### Process Execution<br>
 Runs programs stored in the provided volume.
 Uses memfd_create and fexecve to execute programs from the volume.
-Input Redirection
-Redirects input from a file using < filename.
-Reads the file into a memory-backed file (memfd_create).
-Sets up input redirection using dup2.
-Piping
-Supports multiple pipes (e.g., cat file.txt | grep hi | sort).
-Connects processes using pipe and dup2.
-Logging
-Duplicates shell output to log.txt when run with the -o option.
+
+
+### Input Redirection
+Redirects input from a file using < filename.    <br>
+Reads the file into a memory-backed file (memfd_create).   <br>
+Sets up input redirection using dup2.   <br>
+
+#### Piping   <br>
+Supports multiple pipes (e.g., cat file.txt | grep hi | sort).   <br>
+Connects processes using pipe and dup2.  <br>
+
+### Logging
+Duplicates shell output to log.txt when run with the -o option. <br>
 Intercepts and logs the final process output in a pipeline.
 
