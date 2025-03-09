@@ -5,21 +5,24 @@ This project implements an interactive shell (`nqp_shell`) for an exFAT-formatte
 
 ## Compilation
 To compile the shell, run:
+
+
 ```bash
-make
-'''
+   make
+   ```
 
 To start the shell with a volume 
 
-```sh
-./nqp_shell root.img
-'''
+```bash
+   ./nqp_shell root.img
+   ```
+
 
 To Enable Logging 
 
-```sh
-./nqp_shell root.img -o log.txt
-'''
+```bash
+   ./nqp_shell root.img -o log.txt
+```
 
 
 Features
