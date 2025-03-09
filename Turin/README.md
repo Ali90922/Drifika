@@ -27,12 +27,13 @@ To Enable Logging
 
 Features
 
-Built-in Commands
-cd <dir> - Change the current working directory.
-pwd - Print the current working directory.
-ls - List the contents of the current directory.
-clear - Clears the terminal screen.
-Process Execution
+### Built-in Commands
+cd <dir> - Change the current working directory. <br>
+pwd - Print the current working directory. <br>
+ls - List the contents of the current directory.<br>
+clear - Clears the terminal screen.<br>
+
+###Process Execution<br>
 Runs programs stored in the provided volume.
 Uses memfd_create and fexecve to execute programs from the volume.
 Input Redirection
