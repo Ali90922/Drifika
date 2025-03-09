@@ -5,7 +5,7 @@ This project implements an interactive shell (`nqp_shell`) for an exFAT-formatte
 
 ## Compilation
 To compile the shell, run:
-```sh
+```bash
 make
 '''
 
