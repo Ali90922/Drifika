@@ -33,6 +33,6 @@ int main(void) {
         perror("fork");
         exit(EXIT_FAILURE);
     }
-    return 0;
+    return 0  ;
 }
 
