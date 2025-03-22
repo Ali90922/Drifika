@@ -1,0 +1,4 @@
+*.o
+*.swp
+nqp_printer
+nqp_refiner
