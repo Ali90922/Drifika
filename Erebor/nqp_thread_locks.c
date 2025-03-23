@@ -1,5 +1,6 @@
 #include <stdatomic.h>
 #include "nqp_thread_locks.h"
+#include <stdlib.h>
 
 // Assignment Instructions :
 /*
