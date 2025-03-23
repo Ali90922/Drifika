@@ -1,0 +1,32 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <unistd.h>
+
+// Function executed by the new thread
+void *thread_function(void *arg) {
+    printf("Thread [%ld] started.\n", pthread_self());
+    sleep(2); // Simulate some work
+    printf("Thread [%ld] finished.\n", pthread_self());
+    return NULL;
+}
+
+int main() {
+    pthread_t thread1, thread2;
+
+    printf("Main thread [%ld] creating two threads...\n", pthread_self());
+
+    // Create two threads
+    pthread_create(&thread1, NULL, thread_function, NULL);
+    pthread_create(&thread2, NULL, thread_function, NULL);
+
+    printf("Main thread [%ld] continues execution while threads run.\n", pthread_self());
+
+    // Wait for both threads to finish
+    pthread_join(thread1, NULL);
+    pthread_join(thread2, NULL);
+
+    printf("Main thread [%ld] exits after threads finish.\n", pthread_self());
+    return 0;
+}
+
