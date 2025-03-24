@@ -23,10 +23,15 @@ As you continue your implementation of concurrency: when a lock cannot be acquir
   may still spin prior to yielding, but spinning should not be “infinite” (your thread must
   eventually give up control because no other thread can release the lock until your thread
   has given up control).
-
-
-
 */
+
+
+// Define the internal structure for your mutex.
+struct NQP_THREAD_MUTEX_T {
+    atomic_flag flag;
+};
+
+
 /**
  * Initialize an nqp_mutex_t.
  *
