@@ -112,7 +112,14 @@ int nqp_thread_mutex_trylock(nqp_mutex_t *mutex)
         return -1; // Error: NULL pointer provided.
     }
 
-    return -1;
+    // Try to atomically set the flag.
+    // If the flag was clear, then the lock is acquired.
+    if (!atomic_flag_test_and_set_explicit(&mutex->flag, memory_order_acquire))
+    {
+        return 0; // Successfully acquired the lock.
+    }
+
+    return 1; // Lock is already held by another thread.
 }
 
 /**
