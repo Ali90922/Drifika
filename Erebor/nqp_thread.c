@@ -1,5 +1,7 @@
 #include <stdlib.h>
 #include <assert.h>
+#include <ucontext.h>
+
 
 #include "nqp_thread.h"
 #include "nqp_thread_sched.h"
