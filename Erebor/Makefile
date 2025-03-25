@@ -6,7 +6,7 @@
 # to copy and use this Makefile for their own work.
 
 CC = clang
-CFLAGS = -Wall -Werror -Wextra -Wpedantic  -D_FORTIFY_SOURCE=3 -g
+CFLAGS = -Wall -Werror -Wextra -Wpedantic -O2  -D_FORTIFY_SOURCE=3 -g
 
 .PHONY: clean
 
