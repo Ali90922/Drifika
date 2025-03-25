@@ -1,5 +1,8 @@
 #include <stdatomic.h>
 #include "nqp_thread_locks.h"
+
+#include "nqp_thread_sched.h"
+// Need the above file for the NQP Yeilf function
 #include <stdlib.h>
 
 // After SPIN_THRESHOLD iterations, the thread will yield its time slice.
