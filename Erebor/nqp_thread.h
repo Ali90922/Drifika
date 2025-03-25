@@ -1,7 +1,7 @@
 #pragma once
 
 typedef struct NQP_THREAD_T nqp_thread_t;
-typedef struct thread_control_block;
+struct thread_control_block;
 
 /**
  * Initialize an nqp_thread_t.
