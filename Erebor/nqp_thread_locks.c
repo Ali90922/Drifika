@@ -39,8 +39,18 @@ struct NQP_THREAD_MUTEX_T {
  */
 nqp_mutex_t *nqp_thread_mutex_init(void)
 {
-    return NULL;
+    // Allocate memory for the mutex.
+    nqp_mutex_t *mutex = malloc(sizeof(struct NQP_THREAD_MUTEX_T));
+    if (!mutex) {
+        return NULL; // Allocation failed.
+    }
+    
+    // Initialize the atomic flag to the unlocked state.
+    atomic_flag_clear(&mutex->flag);
+    
+    return mutex;
 }
+
 
 int nqp_thread_mutex_lock(nqp_mutex_t *mutex)
 {
