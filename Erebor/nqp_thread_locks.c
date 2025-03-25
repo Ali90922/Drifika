@@ -68,6 +68,22 @@ int nqp_thread_mutex_lock(nqp_mutex_t *mutex)
     return -1;
 }
 
+
+
+/**
+ * Try to lock the passed mutex. This function will always immediately return 
+ * (this function will never block the calling thread). The value returned
+ * indicates whether or not the mutex was acquired by the caller. Caller is
+ * responsible for checking whether or not it has successfully acquired the
+ * mutex before entering a critical section.
+ *
+ * Args:
+ *  mutex: must not be NULL, must have been previously initialized.
+ * Return:
+ *  * 0 on success (the lock has been acquired).
+ *  * A positive, non-zero value on failure to acquire the mutex.
+ *  * -1 on error.
+ */
 int nqp_thread_mutex_trylock(nqp_mutex_t *mutex)
 {
     (void)mutex;
@@ -75,12 +91,30 @@ int nqp_thread_mutex_trylock(nqp_mutex_t *mutex)
     return -1;
 }
 
+
+/**
+ * Release a previously acquired mutex.
+ *
+ * Args:
+ *  mutex: must not be NULL, must have been previously initialized.
+ * Return: 0 on success, -1 on error.
+ */
+
 int nqp_thread_mutex_unlock(nqp_mutex_t *mutex)
 {
     (void)mutex;
 
     return -1;
 }
+
+
+/**
+ * Destroy a mutex. The mutex should not be re-used after calling this function.
+ *
+ * Args:
+ *  mutex: must not be NULL, must have been previously initialized.
+ * Returns: 0 on success, -1 on error.
+ */
 
 int nqp_thread_mutex_destroy(nqp_mutex_t *mutex)
 {
