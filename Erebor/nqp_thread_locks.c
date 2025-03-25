@@ -145,14 +145,6 @@ int nqp_thread_mutex_unlock(nqp_mutex_t *mutex)
     return 0;
 }
 
-/**
- * Destroy a mutex. The mutex should not be re-used after calling this function.
- *
- * Args:
- *  mutex: must not be NULL, must have been previously initialized.
- * Returns: 0 on success, -1 on error.
- */
-
 int nqp_thread_mutex_destroy(nqp_mutex_t *mutex)
 {
     if (!mutex)
