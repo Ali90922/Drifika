@@ -51,6 +51,15 @@ nqp_mutex_t *nqp_thread_mutex_init(void)
     return mutex;
 }
 
+/**
+ * Lock the passed mutex. Will either immediately return and the calling thread
+ * will have acquired the mutex, or will block until the mutex is available to
+ * be acquired by the calling thread.
+ *
+ * Args:
+ *  mutex: must not be NULL, must have previously been initialized.
+ * Return: 0 on success, -1 on error.
+ */
 
 int nqp_thread_mutex_lock(nqp_mutex_t *mutex)
 {
