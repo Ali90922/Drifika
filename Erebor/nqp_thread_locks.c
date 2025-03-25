@@ -132,9 +132,14 @@ int nqp_thread_mutex_trylock(nqp_mutex_t *mutex)
 
 int nqp_thread_mutex_unlock(nqp_mutex_t *mutex)
 {
-    (void)mutex;
+    if (!mutex)
+    {
+        return -1; // Error: NULL pointer provided.
+    }
 
-    return -1;
+    // Release the lock by clearing the atomic flag.
+    atomic_flag_clear_explicit(&mutex->flag, memory_order_release);
+    return 0;
 }
 
 /**
@@ -147,7 +152,11 @@ int nqp_thread_mutex_unlock(nqp_mutex_t *mutex)
 
 int nqp_thread_mutex_destroy(nqp_mutex_t *mutex)
 {
-    (void)mutex;
+    if (!mutex)
+    {
+        return -1; // Error: NULL pointer provided.
+    }
 
-    return -1;
+    free(mutex);
+    return 0;
 }
