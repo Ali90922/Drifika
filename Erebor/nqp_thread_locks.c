@@ -78,6 +78,9 @@ int nqp_thread_mutex_lock(nqp_mutex_t *mutex)
     // If the flag was clear, it returns false and the lock is acquired.
     while (atomic_flag_test_and_set_explicit(&mutex->flag, memory_order_acquire))
     {
+        // only enters this while loop condition of the above condition evalutes to true --
+        // meaning that the lock was not available to acquire
+
         // If we've spun for a while, yield control to allow other threads to run.
         if (++spin_count >= SPIN_THRESHOLD)
         {
