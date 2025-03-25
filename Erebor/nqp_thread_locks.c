@@ -2,6 +2,9 @@
 #include "nqp_thread_locks.h"
 #include <stdlib.h>
 
+// After SPIN_THRESHOLD iterations, the thread will yield its time slice.
+#define SPIN_THRESHOLD 1000
+
 // Assignment Instructions :
 /*
 
@@ -66,6 +69,20 @@ int nqp_thread_mutex_lock(nqp_mutex_t *mutex)
     if (!mutex) {
         return -1; // Error: NULL pointer provided.
     }
+
+    // Then check the state of the lock 
+        int spin_count = 0;
+    // Attempt to acquire the lock in a loop.
+    // atomic_flag_test_and_set_explicit sets the flag and returns its previous value.
+    // If the flag was clear, it returns false and the lock is acquired.
+    while (atomic_flag_test_and_set_explicit(&mutex->flag, memory_order_acquire)) {
+        // If we've spun for a while, yield control to allow other threads to run.
+        if (++spin_count >= SPIN_THRESHOLD) {
+            nqp_yield();
+            spin_count = 0;
+        }
+    }
+    return 0;
 }
 
 
