@@ -28,12 +28,11 @@ As you continue your implementation of concurrency: when a lock cannot be acquir
   has given up control).
 */
 
-
 // Define the internal structure for your mutex.
-struct NQP_THREAD_MUTEX_T {
+struct NQP_THREAD_MUTEX_T
+{
     atomic_flag flag;
 };
-
 
 /**
  * Initialize an nqp_mutex_t.
@@ -44,13 +43,14 @@ nqp_mutex_t *nqp_thread_mutex_init(void)
 {
     // Allocate memory for the mutex.
     nqp_mutex_t *mutex = malloc(sizeof(struct NQP_THREAD_MUTEX_T));
-    if (!mutex) {
+    if (!mutex)
+    {
         return NULL; // Allocation failed.
     }
-    
+
     // Initialize the atomic flag to the unlocked state.
     atomic_flag_clear(&mutex->flag);
-    
+
     return mutex;
 }
 
@@ -66,18 +66,21 @@ nqp_mutex_t *nqp_thread_mutex_init(void)
 
 int nqp_thread_mutex_lock(nqp_mutex_t *mutex)
 {
-    if (!mutex) {
+    if (!mutex)
+    {
         return -1; // Error: NULL pointer provided.
     }
 
-    // Then check the state of the lock 
-        int spin_count = 0;
+    // Then check the state of the lock
+    int spin_count = 0;
     // Attempt to acquire the lock in a loop.
     // atomic_flag_test_and_set_explicit sets the flag and returns its previous value.
     // If the flag was clear, it returns false and the lock is acquired.
-    while (atomic_flag_test_and_set_explicit(&mutex->flag, memory_order_acquire)) {
+    while (atomic_flag_test_and_set_explicit(&mutex->flag, memory_order_acquire))
+    {
         // If we've spun for a while, yield control to allow other threads to run.
-        if (++spin_count >= SPIN_THRESHOLD) {
+        if (++spin_count >= SPIN_THRESHOLD)
+        {
             nqp_yield();
             spin_count = 0;
         }
@@ -85,10 +88,8 @@ int nqp_thread_mutex_lock(nqp_mutex_t *mutex)
     return 0;
 }
 
-
-
 /**
- * Try to lock the passed mutex. This function will always immediately return 
+ * Try to lock the passed mutex. This function will always immediately return
  * (this function will never block the calling thread). The value returned
  * indicates whether or not the mutex was acquired by the caller. Caller is
  * responsible for checking whether or not it has successfully acquired the
@@ -103,11 +104,13 @@ int nqp_thread_mutex_lock(nqp_mutex_t *mutex)
  */
 int nqp_thread_mutex_trylock(nqp_mutex_t *mutex)
 {
-    (void)mutex;
+    if (!mutex)
+    {
+        return -1; // Error: NULL pointer provided.
+    }
 
     return -1;
 }
-
 
 /**
  * Release a previously acquired mutex.
@@ -123,7 +126,6 @@ int nqp_thread_mutex_unlock(nqp_mutex_t *mutex)
 
     return -1;
 }
-
 
 /**
  * Destroy a mutex. The mutex should not be re-used after calling this function.
