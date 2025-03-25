@@ -28,7 +28,7 @@ As you continue your implementation of concurrency: when a lock cannot be acquir
   has given up control).
 */
 
-// Define the internal structure for your mutex.
+// Define the internal structure for my mutex.
 struct NQP_THREAD_MUTEX_T
 {
     atomic_flag flag;
