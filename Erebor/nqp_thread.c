@@ -10,6 +10,7 @@ typedef struct thread_control_block
 {
     ucontext_t context;
     void *stack;
+    int finished; // 0 means running, 1 means finished
     // Optionally, add thread ID, status, priority, etc.
 } nqp_thread_t;
 
