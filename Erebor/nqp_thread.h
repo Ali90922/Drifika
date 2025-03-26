@@ -25,3 +25,6 @@ nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg);
  * Return: 0 on success (e.g., the thread has exited), -1 on failure.
  */
 int nqp_thread_join(nqp_thread_t *thread);
+
+// Helper Function -- for setting the done flag
+void thread_wrapper(void (*task)(void *), void *arg, nqp_thread_t *thread);
