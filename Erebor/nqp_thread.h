@@ -1,6 +1,6 @@
 #pragma once
 
-typedef struct NQP_THREAD_T nqp_thread_t;
+struct nqp_thread_t;
 struct thread_control_block;
 
 /**
