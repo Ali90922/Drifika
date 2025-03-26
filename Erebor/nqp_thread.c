@@ -14,6 +14,17 @@ typedef struct thread_control_block
 
 static nqp_scheduling_policy system_policy = NQP_SP_TWOTHREADS;
 
+/**
+ * Initialize an nqp_thread_t.
+ *
+ * Args:
+ *  task: the function that this thread should begin executing in. Must not be
+ *        NULL.
+ *  arg: the arguments to be passed to the function. May be NULL if the function
+ *       does not actually use the arguments passed to it.
+ * Return: An initialized thread or NULL on error.
+ */
+
 nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
 {
     assert(task != NULL);
