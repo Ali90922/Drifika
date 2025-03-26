@@ -55,13 +55,20 @@ nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
         return NULL;
     }
 
-    (void)arg;
+    // set up the stack
+    new_thread->context.uc_stack.ss_sp = new_thread->stack;
+    new_thread->context.uc_stack.ss_size = SIGSTKSZ;
+    new_thread->context.uc_stack.ss_flags = 0;
+    // You can set uc_link to a context to return to when this thread finishes.
+    // For now, we'll set it to NULL.
+    new_thread->context.uc_link = NULL;
 
-    if (task != NULL)
-    {
-    }
+    // Configure the context to begin execution in the task function.
+    // makecontext expects a function that takes no arguments, so we cast.
+    // The '1' indicates that one argument will be passed.
+    makecontext(&new_thread->context, (void (*)(void))task, 1, arg);
 
-    return NULL;
+    return new_thread;
 }
 
 int nqp_thread_join(nqp_thread_t *thread)
