@@ -11,7 +11,7 @@ typedef struct thread_control_block
     ucontext_t context;
     void *stack;
     // Optionally, add thread ID, status, priority, etc.
-} tcb_t;
+} nqp_thread_t;
 
 static nqp_scheduling_policy system_policy = NQP_SP_TWOTHREADS;
 
@@ -29,6 +29,14 @@ static nqp_scheduling_policy system_policy = NQP_SP_TWOTHREADS;
 nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
 {
     assert(task != NULL);
+
+    // Allocate memory for the thread control block.
+    nqp_thread_t *new_thread = malloc(sizeof(nqp_thread_t));
+    if (new_thread == NULL)
+    {
+        return NULL;
+    }
+
     (void)arg;
 
     if (task != NULL)
