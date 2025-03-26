@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <ucontext.h>
+#include <signal.h>
 
 #include "nqp_thread.h"
 #include "nqp_thread_sched.h"
@@ -32,8 +33,16 @@ nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
 
     if (task != NULL)
     {
+        stack_t sigstk; // Declare the sigstk variable
         // Have to implement a new stack for the new thread of execution we want to run
+        if ((sigstk.ss_sp = malloc(SIGSTKSZ)) == NULL)
+        {
+            return NULL;
         }
+        else
+        {
+        }
+    }
 
     return NULL;
 }
@@ -48,6 +57,13 @@ int nqp_thread_join(nqp_thread_t *thread)
 
     return -1;
 }
+
+// --------------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------
 
 // 4 Fucntions from nqp_thread_sched.h !
 int nqp_sched_init(const nqp_scheduling_policy policy,
