@@ -46,19 +46,19 @@ nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
         return NULL;
     }
 
+    // Now have to set the context for the new thread !
+    // Initialize the thread's context.
+    if (getcontext(&new_thread->context) == -1)
+    {
+        free(new_thread->stack);
+        free(new_thread);
+        return NULL;
+    }
+
     (void)arg;
 
     if (task != NULL)
     {
-        stack_t sigstk; // Declare the sigstk variable
-        // Have to implement a new stack for the new thread of execution we want to run
-        if ((sigstk.ss_sp = malloc(SIGSTKSZ)) == NULL)
-        {
-            return NULL;
-        }
-        else
-        {
-        }
     }
 
     return NULL;
