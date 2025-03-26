@@ -9,11 +9,6 @@
 
 #define MAX_THREADS 10
 
-// Global thread queue and scheduling index.
-static nqp_thread_t *thread_queue[MAX_THREADS];
-static int num_threads = 0;
-static int current_index = 0;
-
 typedef struct nqp_thread_t
 {
     ucontext_t context;
