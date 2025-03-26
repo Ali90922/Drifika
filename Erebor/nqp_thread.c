@@ -32,14 +32,13 @@ nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
     assert(task != NULL);
 
     // Allocate memory for the thread control block.
-
     nqp_thread_t *new_thread = malloc(sizeof(nqp_thread_t));
     if (new_thread == NULL)
     {
         return NULL;
     }
 
-    // Allocate a new stack for the thread -- Look back at the struct for the new_thread!
+    // Allocate a new stack for the thread.
     new_thread->stack = malloc(SIGSTKSZ);
     if (new_thread->stack == NULL)
     {
@@ -47,7 +46,6 @@ nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
         return NULL;
     }
 
-    // Now have to set the context for the new thread !
     // Initialize the thread's context.
     if (getcontext(&new_thread->context) == -1)
     {
@@ -56,20 +54,31 @@ nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
         return NULL;
     }
 
-    // set up the stack
+    // Initialize the finished flag.
+    new_thread->finished = 0;
+
+    // Set up the stack for the new context.
     new_thread->context.uc_stack.ss_sp = new_thread->stack;
     new_thread->context.uc_stack.ss_size = SIGSTKSZ;
     new_thread->context.uc_stack.ss_flags = 0;
-    // You can set uc_link to a context to return to when this thread finishes.
-    // For now, we'll set it to NULL.
     new_thread->context.uc_link = NULL;
 
-    // Configure the context to begin execution in the task function.
-    // makecontext expects a function that takes no arguments, so we cast.
-    // The '1' indicates that one argument will be passed.
-    makecontext(&new_thread->context, (void (*)(void))task, 1, arg);
+    // Instead of running 'task' directly, run thread_wrapper.
+    // The '3' indicates that three arguments will be passed.
+    makecontext(&new_thread->context, (void (*)(void))thread_wrapper, 3, task, arg, new_thread);
 
     return new_thread;
+}
+
+// Helper Function -- for the Done Flag
+void thread_wrapper(void (*task)(void *), void *arg, nqp_thread_t *thread)
+{
+    // Execute the user-provided function.
+    task(arg);
+    // Mark the thread as finished.
+    thread->finished = 1;
+    // Terminate the thread (and remove it from the scheduler).
+    nqp_exit();
 }
 
 /**
