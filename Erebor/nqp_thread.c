@@ -2,7 +2,6 @@
 #include <assert.h>
 #include <ucontext.h>
 
-
 #include "nqp_thread.h"
 #include "nqp_thread_sched.h"
 
@@ -38,6 +37,7 @@ int nqp_thread_join(nqp_thread_t *thread)
     return -1;
 }
 
+// 4 Fucntions from nqp_thread_sched.h !
 int nqp_sched_init(const nqp_scheduling_policy policy,
                    const nqp_sp_settings *settings)
 {
