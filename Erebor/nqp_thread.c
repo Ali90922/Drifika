@@ -32,7 +32,8 @@ nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
 
     if (task != NULL)
     {
-    }
+        // Have to implement a new stack for the new thread of execution we want to run
+        }
 
     return NULL;
 }
