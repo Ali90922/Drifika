@@ -31,9 +31,18 @@ nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
     assert(task != NULL);
 
     // Allocate memory for the thread control block.
+
     nqp_thread_t *new_thread = malloc(sizeof(nqp_thread_t));
     if (new_thread == NULL)
     {
+        return NULL;
+    }
+
+    // Allocate a new stack for the thread -- Look back at the struct for the new_thread!
+    new_thread->stack = malloc(SIGSTKSZ);
+    if (new_thread->stack == NULL)
+    {
+        free(new_thread);
         return NULL;
     }
 
