@@ -95,11 +95,13 @@ int nqp_thread_join(nqp_thread_t *thread)
 {
     assert(thread != NULL);
 
-    if (thread != NULL)
+    // Busy-wait (with yielding) until the thread is finished.
+    while (!thread->finished)
     {
+        nqp_yield();
     }
 
-    return -1;
+    return 0; // Successfully joined.
 }
 
 // 4 Fucntions from nqp_thread_sched.h !
