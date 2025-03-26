@@ -20,6 +20,7 @@ typedef struct nqp_thread_t
     void *stack;
     int finished; // 0 means running, 1 means finished
     // Optionally, add thread ID, status, priority, etc.
+    int id; // Unique identifier for the thread.
 } nqp_thread_t;
 
 static nqp_scheduling_policy system_policy = NQP_SP_TWOTHREADS;
