@@ -5,6 +5,14 @@
 
 #include "nqp_thread.h"
 #include "nqp_thread_sched.h"
+// For simplicity, assume we have a fixed-size thread queue.
+
+#define MAX_THREADS 10
+
+// Global thread queue and scheduling index.
+static nqp_thread_t *thread_queue[MAX_THREADS];
+static int num_threads = 0;
+static int current_index = 0;
 
 typedef struct nqp_thread_t
 {
@@ -106,6 +114,19 @@ int nqp_thread_join(nqp_thread_t *thread)
 
 // 4 Fucntions from nqp_thread_sched.h !
 
+/**
+ * The policy that should be used when deciding which task to switch to next
+ * upon a call to yield.
+ *
+ * Args:
+ *  policy: the policy to apply. Must be a policy as defined in
+ *          NQP_SCHEDULING_POLICY.
+ *  settings: The settings for the policy to apply. May be NULL, depending on
+ *            the policy being set. See nqp_scheduling_policy.
+ * Returns: 0 on success, -1 on failure (e.g., the specified policy is not in
+ *          NQP_SCHEDULING_POLICY).
+ */
+
 int nqp_sched_init(const nqp_scheduling_policy policy,
                    const nqp_sp_settings *settings)
 {
@@ -122,6 +143,14 @@ int nqp_sched_init(const nqp_scheduling_policy policy,
     return ret;
 }
 
+/**
+ * Voluntarily give up control of the processor and allow the scheduler to
+ * schedule another task.
+ *
+ * When called outside of the context of an NQP thread (e.g., nqp_thread_start
+ * has not been called), this function should have no side-effects at all (the
+ * function should behave as a no-op).
+ */
 void nqp_yield(void)
 {
     // schedule another (maybe different) task.
