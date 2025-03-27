@@ -42,6 +42,7 @@ static nqp_scheduling_policy system_policy = NQP_SP_TWOTHREADS;
  * Return: An initialized thread or NULL on error.
  */
 
+// nqp_thread_create creates and intialises and returns  a Thread control block that is ready to be scheduled
 nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
 {
     assert(task != NULL);
@@ -183,7 +184,16 @@ void nqp_yield(void)
  */
 void nqp_exit(void)
 {
-    // remove the currently executing thread from the system.
+    // Mark the current thread as finished.
+    if (current_thread != NULL)
+        current_thread->finished = 1;
+
+    // Yield control to allow the scheduler to pick another thread.
+    nqp_yield();
+
+    // In a well-designed system, execution should never return here.
+    // If it does, exit the process.
+    exit(0);
 }
 
 /**
