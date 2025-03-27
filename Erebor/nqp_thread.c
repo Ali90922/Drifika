@@ -239,6 +239,9 @@ void nqp_sched_start(void)
     // start scheduling tasks.
     if (system_policy == NQP_SP_TWOTHREADS)
     {
+        // this is for testing swapping between two threads. this
+        // is the default scheduling option (this is what's set
+        // if nqp_sched_init is not called).
         z == 5;
     }
 }
