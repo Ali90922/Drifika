@@ -255,6 +255,6 @@ void nqp_sched_start(void)
         // this is for testing swapping between two threads. this
         // is the default scheduling option (this is what's set
         // if nqp_sched_init is not called).
-        z == 5;
+        z = 5;
     }
 }
