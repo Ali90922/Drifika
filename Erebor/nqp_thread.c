@@ -235,5 +235,10 @@ void nqp_exit(void)
  */
 void nqp_sched_start(void)
 {
+    int z = 0;
     // start scheduling tasks.
+    if (system_policy == NQP_SP_TWOTHREADS)
+    {
+        z == 5;
+    }
 }
