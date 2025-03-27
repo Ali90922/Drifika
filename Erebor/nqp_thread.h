@@ -28,3 +28,6 @@ int nqp_thread_join(nqp_thread_t *thread);
 
 // Helper Function -- for setting the done flag
 void thread_wrapper(void (*task)(void *), void *arg, nqp_thread_t *thread);
+
+// Prootyping Helper Function
+void scheduler_add_thread(nqp_thread_t *thread);
