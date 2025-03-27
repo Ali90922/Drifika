@@ -171,7 +171,33 @@ int nqp_sched_init(const nqp_scheduling_policy policy,
  */
 void nqp_yield(void)
 {
-    // schedule another (maybe different) task.
+    // If not running inside an NQP thread, do nothing.
+    if (current_thread == NULL)
+        return;
+
+    nqp_thread_t *prev = current_thread;
+
+    // Round-robin: advance current_index modulo the number of threads.
+    int next_index = (current_index + 1) % num_threads;
+    nqp_thread_t *next = thread_queue[next_index];
+
+    // Skip finished threads. (This simple loop stops if it circles back to the current thread.)
+    int iterations = 0;
+    while (next->finished && iterations < num_threads)
+    {
+        next_index = (next_index + 1) % num_threads;
+        next = thread_queue[next_index];
+        iterations++;
+    }
+    // If all threads are finished (or the next is still the current one), do nothing.
+    if (next == prev)
+        return;
+
+    current_index = next_index;
+    current_thread = next;
+
+    // Swap contexts: save current state and switch to next thread.
+    swapcontext(&prev->context, &next->context);
 }
 
 /**
