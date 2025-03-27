@@ -238,6 +238,12 @@ void nqp_sched_start(void)
     // start scheduling tasks.
 
     // Need if else statements with :   system_policy
+    /*
+    For NQP_SP_TWOTHREADS: Swap between the two threads.
+    For NQP_SP_FIFO: Always run the next thread in FIFO order.
+    For NQP_SP_RR: Use round-robin scheduling.
+    For NQP_SP_MLFQ: Use multiple queues and adjust priorities
+    */
 
     if (num_threads == 0)
         return;
