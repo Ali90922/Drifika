@@ -152,11 +152,30 @@ void nqp_yield(void)
     // schedule another (maybe different) task.
 }
 
+/**
+ * The current task is done, it should be removed from the queue of tasks to
+ * be scheduled.
+ *
+ * When called outside of the context of an NQP thread (e.g., nqp_thread_start
+ * has not been called), this function should have no side-effects at all (the
+ * function should behave as a no-op).
+ */
 void nqp_exit(void)
 {
     // remove the currently executing thread from the system.
 }
 
+/**
+ * Start scheduling tasks.
+ *
+ * If the NQP_SP_TWOTHREADS policy is selected, control flow will never return
+ * to the caller (the program must be terminated by sending the SIGINT signal).
+ *
+ * If any other scheduling policy is selected, control flow will eventually
+ * return to the caller. The caller is then responsible for blocking itself
+ * until all threads of execution that it has started have finished by calling
+ * nqp_thread_join for each thread it has started.
+ */
 void nqp_sched_start(void)
 {
     // start scheduling tasks.
