@@ -241,6 +241,15 @@ void nqp_sched_start(void)
     if (num_threads == 0)
         return;
 
+    current_index = 0;
+    current_thread = thread_queue[current_index];
+
+    // This swapcontext never returns unless all threads call nqp_exit and no thread is runnable.
+    ucontext_t main_context;
+    swapcontext(&main_context, &current_thread->context);
+
+    // Control will only reach here if the scheduler is designed to eventually return.
+
     if (system_policy == NQP_SP_TWOTHREADS)
     {
         // this is for testing swapping between two threads. this
