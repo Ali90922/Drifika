@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <ucontext.h>
@@ -93,6 +94,21 @@ void thread_wrapper(void (*task)(void *), void *arg, nqp_thread_t *thread)
     thread->finished = 1;
     // Terminate the thread (and remove it from the scheduler).
     nqp_exit();
+}
+
+// Helper Function to add thread to the global queue
+void scheduler_add_thread(nqp_thread_t *thread)
+{
+    if (num_threads < MAX_THREADS)
+    {
+        thread_queue[num_threads++] = thread;
+    }
+    else
+    {
+        // Handle error: exceeded maximum threads (or dynamically grow the queue)
+        fprintf(stderr, "Exceeded maximum thread capacity!\n");
+        exit(EXIT_FAILURE);
+    }
 }
 
 /**
