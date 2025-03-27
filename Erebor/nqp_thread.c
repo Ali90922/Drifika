@@ -237,6 +237,8 @@ void nqp_sched_start(void)
 {
     // start scheduling tasks.
 
+    // Need if else statements with :   system_policy
+
     if (num_threads == 0)
         return;
 
