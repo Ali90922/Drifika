@@ -237,6 +237,10 @@ void nqp_sched_start(void)
 {
     int z = 0;
     // start scheduling tasks.
+
+    if (num_threads == 0)
+        return;
+
     if (system_policy == NQP_SP_TWOTHREADS)
     {
         // this is for testing swapping between two threads. this
