@@ -45,15 +45,10 @@ static nqp_scheduling_policy system_policy = NQP_SP_TWOTHREADS;
 nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
 {
     assert(task != NULL);
-
-    // Allocate memory for the thread control block.
     nqp_thread_t *new_thread = malloc(sizeof(nqp_thread_t));
     if (new_thread == NULL)
-    {
         return NULL;
-    }
 
-    // Allocate a new stack for the thread.
     new_thread->stack = malloc(SIGSTKSZ);
     if (new_thread->stack == NULL)
     {
@@ -61,7 +56,6 @@ nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
         return NULL;
     }
 
-    // Initialize the thread's context.
     if (getcontext(&new_thread->context) == -1)
     {
         free(new_thread->stack);
@@ -69,18 +63,19 @@ nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
         return NULL;
     }
 
-    // Initialize the finished flag.
     new_thread->finished = 0;
+    // (Optional) You already have an 'id' field; you might assign it here.
 
-    // Set up the stack for the new context.
     new_thread->context.uc_stack.ss_sp = new_thread->stack;
     new_thread->context.uc_stack.ss_size = SIGSTKSZ;
     new_thread->context.uc_stack.ss_flags = 0;
     new_thread->context.uc_link = NULL;
 
-    // Instead of running 'task' directly, run thread_wrapper.
-    // The '3' indicates that three arguments will be passed.
+    // Use thread_wrapper to run the task, mark finished, and exit.
     makecontext(&new_thread->context, (void (*)(void))thread_wrapper, 3, task, arg, new_thread);
+
+    // Add the new thread to the scheduler's queue.
+    scheduler_add_thread(new_thread);
 
     return new_thread;
 }
