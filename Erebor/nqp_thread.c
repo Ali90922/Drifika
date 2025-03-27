@@ -9,6 +9,16 @@
 
 #define MAX_THREADS 10
 
+// Queue Datastructures to hold the threads :
+
+// Global scheduler queue: holds pointers to all NQP threads that are runnable.
+static nqp_thread_t *thread_queue[MAX_THREADS];
+static int num_threads = 0;   // How many threads have been added to the scheduler.
+static int current_index = 0; // Index of the currently running thread.
+
+// Global pointer to the currently running thread.
+static nqp_thread_t *current_thread = NULL;
+
 typedef struct nqp_thread_t
 {
     ucontext_t context;
