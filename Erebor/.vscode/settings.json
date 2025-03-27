@@ -1,0 +1,5 @@
+{
+  "files.associations": {
+    "nqp_thread_sched.h": "c"
+  }
+}

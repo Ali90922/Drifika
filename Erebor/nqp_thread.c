@@ -8,7 +8,7 @@
 #include "nqp_thread_sched.h"
 // For simplicity, assume we have a fixed-size thread queue.
 
-#define MAX_THREADS 10
+#define MAX_THREADS 40
 
 // Queue Datastructures to hold the threads :
 
