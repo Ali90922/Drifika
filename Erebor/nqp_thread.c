@@ -249,15 +249,14 @@ void nqp_sched_start(void)
     if (num_threads == 0)
         return;
 
-    current_index = 0;
-    current_thread = thread_queue[current_index];
-
-    // This swapcontext never returns unless all threads call nqp_exit and no thread is runnable.
-    ucontext_t main_context;
-    swapcontext(&main_context, &current_thread->context);
-
     if (system_policy == NQP_SP_TWOTHREADS)
     {
+        current_index = 0;
+        current_thread = thread_queue[current_index];
+
+        // This swapcontext never returns unless all threads call nqp_exit and no thread is runnable.
+        ucontext_t main_context;
+        swapcontext(&main_context, &current_thread->context);
     }
     else if (system_policy == NQP_SP_FIFO)
     {
