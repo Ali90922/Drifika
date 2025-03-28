@@ -256,5 +256,13 @@ void nqp_sched_start(void)
     ucontext_t main_context;
     swapcontext(&main_context, &current_thread->context);
 
+    if (system_policy == NQP_SP_TWOTHREADS)
+    {
+    }
+    else if (system_policy == NQP_SP_FIFO)
+    {
+    }
+    else if (system_policy ==)
+
     // Control will only reach here if the scheduler is designed to eventually return.
 }
