@@ -261,15 +261,27 @@ void nqp_sched_start(void)
         // This swapcontext never returns unless all threads call nqp_exit and no thread is runnable.
         ucontext_t main_context;
         swapcontext(&main_context, &current_thread->context);
-        }
+    }
     else if (system_policy == NQP_SP_FIFO)
     {
+        // FIFO scheduling, yield should reschedule the current
+        // task until it is fully complete (it calls
+        // nqp_exit()); this policy will not work with tasks that
+        // attempt to acquire locks (lock acquisition would
+        // result in the same task always being scheduled).
     }
     else if (system_policy == NQP_SP_RR)
     {
+        // RR scheduling, yield should schedule the next task in
+        // the queue.
     }
     else if (system_policy == NQP_SP_MLFQ)
     {
+        // MLFQ scheduling, yield should schedule the next task
+        // in the queue using MLFQ rules. When passed to
+        // nqp_sched_init, settings must not be NULL and must be
+        // an instance of nqp_sp_settings with the mlfq_settings
+        // field populated.
     }
     else
     {
