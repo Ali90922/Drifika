@@ -233,6 +233,7 @@ void nqp_exit(void)
  * until all threads of execution that it has started have finished by calling
  * nqp_thread_join for each thread it has started.
  */
+
 void nqp_sched_start(void)
 {
     // start scheduling tasks.
