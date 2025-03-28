@@ -6,7 +6,7 @@
 #include "nqp_thread.h"
 #include "nqp_thread_sched.h"
 
-#define THREADS 20
+#define THREADS 40
 #define MAX_PROGRESS 30
 #define MAX_WORK_UNIT 3
 
