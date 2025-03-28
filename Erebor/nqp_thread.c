@@ -8,7 +8,7 @@
 #include "nqp_thread_sched.h"
 // For simplicity, assume we have a fixed-size thread queue.
 
-#define MAX_THREADS 40
+#define MAX_THREADS 50
 
 // Queue Datastructures to hold the threads :
 
@@ -95,7 +95,7 @@ void thread_wrapper(void (*task)(void *), void *arg, nqp_thread_t *thread)
 // Helper Function to add thread to the global queue
 void scheduler_add_thread(nqp_thread_t *thread)
 {
-    if (num_threads < MAX_THREADS + 1) // Hitting the Limit at 40 -- 40 is fine
+    if (num_threads < MAX_THREADS)
     {
         thread_queue[num_threads++] = thread;
     }
