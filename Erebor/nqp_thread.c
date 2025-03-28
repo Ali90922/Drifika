@@ -251,13 +251,17 @@ void nqp_sched_start(void)
 
     if (system_policy == NQP_SP_TWOTHREADS)
     {
+
+        // this is for testing swapping between two threads. this
+        // is the default scheduling option (this is what's set
+        // if nqp_sched_init is not called).
+
         current_index = 0;
         current_thread = thread_queue[current_index];
-
         // This swapcontext never returns unless all threads call nqp_exit and no thread is runnable.
         ucontext_t main_context;
         swapcontext(&main_context, &current_thread->context);
-    }
+        }
     else if (system_policy == NQP_SP_FIFO)
     {
     }
