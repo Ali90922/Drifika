@@ -262,7 +262,16 @@ void nqp_sched_start(void)
     else if (system_policy == NQP_SP_FIFO)
     {
     }
-    else if (system_policy ==)
+    else if (system_policy == NQP_SP_RR)
+    {
+    }
+    else if (system_policy == NQP_SP_MLFQ)
+    {
+    }
+    else
+    {
+        // implement the default policy of swapping two threads
+    }
 
     // Control will only reach here if the scheduler is designed to eventually return.
 }
