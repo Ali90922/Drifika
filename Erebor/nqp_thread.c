@@ -95,7 +95,7 @@ void thread_wrapper(void (*task)(void *), void *arg, nqp_thread_t *thread)
 // Helper Function to add thread to the global queue
 void scheduler_add_thread(nqp_thread_t *thread)
 {
-    if (num_threads < MAX_THREADS)
+    if (num_threads < MAX_THREADS + 1) // Hitting the Limit at 40 -- 40 is fine
     {
         thread_queue[num_threads++] = thread;
     }
