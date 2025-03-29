@@ -38,3 +38,5 @@ ManPrinter.o: ManPrinter.c
 clean:
 	rm -rf nqp_thread_locks.o nqp_thread.o main.o ManPrinter.o \
 		nqp_printer nqp_refiner nqp_sched_tasks nqp_list_insertion test_counter manprinter
+
+# Dont mess around with the man printer
