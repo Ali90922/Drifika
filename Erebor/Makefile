@@ -20,6 +20,9 @@ nqp_sched_tasks: nqp_thread.o
 
 nqp_list_insertion: nqp_thread.o nqp_thread_locks.o
 
+nqp_
+
+
 # New target for compiling main.c with the custom lock implementation.
 test_counter: main.o nqp_thread_locks.o
 	$(CC) $(CFLAGS) -o test_counter main.o nqp_thread_locks.o
@@ -27,6 +30,8 @@ test_counter: main.o nqp_thread_locks.o
 # Rule to build main.o from main.c
 main.o: main.c
 	$(CC) $(CFLAGS) -c main.c
+
+# Rule to build the Posix - Printer (Manual Testing).
 
 clean:
 	rm -rf nqp_thread_locks.o nqp_thread.o main.o nqp_printer nqp_refiner \
