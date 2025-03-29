@@ -253,6 +253,7 @@ void nqp_sched_start(void)
         current_thread = thread_queue[current_index];
         swapcontext(&main_context, &current_thread->context);
     }
+
     else if (system_policy == NQP_SP_FIFO)
     {
         // FIFO scheduling: run threads in the order they were added.
@@ -263,23 +264,33 @@ void nqp_sched_start(void)
         // nqp_exit()); this policy will not work with tasks that
         // attempt to acquire locks (lock acquisition would
         // result in the same task always being scheduled).
+        // FIFO scheduling: always run the first unfinished worker thread.
+        // If that thread yields, immediately reschedule it.
         while (1)
         {
-            int unfinished = 0;
+            // Find the first worker thread that is not finished.
+            nqp_thread_t *next = NULL;
             for (int i = 0; i < num_threads; i++)
             {
                 if (!thread_queue[i]->finished)
                 {
-                    unfinished = 1;
-                    current_thread = thread_queue[i];
-                    // Swap to the thread. When it yields or exits, control returns here.
-                    swapcontext(&main_context, &current_thread->context);
+                    next = thread_queue[i];
+                    break;
                 }
             }
-            if (!unfinished)
+            // If no unfinished worker thread is found, all threads are done.
+            if (next == NULL)
                 break;
+
+            // Set the current thread to the selected worker.
+            current_thread = next;
+            // Swap to that thread's context.
+            // When the thread yields (calling nqp_yield), control will return here.
+            swapcontext(&main_context, &current_thread->context);
+            // After returning, if the thread hasn't finished, the loop will pick it again.
         }
     }
+
     else if (system_policy == NQP_SP_RR)
     {
         // Round-robin scheduling: rotate through the thread queue.
