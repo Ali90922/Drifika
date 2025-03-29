@@ -280,7 +280,9 @@ void nqp_sched_start(void)
             }
             // If no unfinished worker thread is found, all threads are done.
             if (next == NULL)
+            {
                 break;
+            }
 
             // Set the current thread to the selected worker.
             current_thread = next;
