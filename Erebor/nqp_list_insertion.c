@@ -9,7 +9,8 @@
 void build_list(void);
 void print_list(int);
 
-typedef struct NODE {
+typedef struct NODE
+{
     char *value;
     struct NODE *next;
     nqp_mutex_t *node_lock;
@@ -25,24 +26,25 @@ node *head;
 
 void thread_insert_after(void *args)
 {
-    node_insert *insert_operation = (node_insert *) args;
+    node_insert *insert_operation = (node_insert *)args;
 
-    nqp_thread_mutex_lock( insert_operation->insert_after->node_lock ); 
+    nqp_thread_mutex_lock(insert_operation->insert_after->node_lock);
 
     insert_operation->to_insert->next = insert_operation->insert_after->next;
-    nqp_yield( ); // oops; this is the worst-case scenario, every thread is
-                  // always "interrupted" in between getting the next node,
-                  // so all nodes that we are going to insert are lost except
-                  // the last thread to finish running.
+    nqp_yield(); // oops; this is the worst-case scenario, every thread is
+                 // always "interrupted" in between getting the next node,
+                 // so all nodes that we are going to insert are lost except
+                 // the last thread to finish running.
     insert_operation->insert_after->next = insert_operation->to_insert;
-    
-    nqp_thread_mutex_unlock( insert_operation->insert_after->node_lock ); 
 
-    nqp_exit( );
+    nqp_thread_mutex_unlock(insert_operation->insert_after->node_lock);
+
+    nqp_exit();
 }
 
 int main(void)
 {
+    printf("HEHEHEHEHE");
 #define THREADS 20
     nqp_thread_t *threads[THREADS] = {0};
     node_insert inserts[THREADS] = {0};
@@ -60,18 +62,18 @@ int main(void)
     }
     for (int i = 0; i < THREADS; i++)
     {
-        threads[i] = nqp_thread_create(thread_insert_after, &inserts[i] );
+        threads[i] = nqp_thread_create(thread_insert_after, &inserts[i]);
     }
 
-    nqp_sched_init( NQP_SP_RR, NULL );
-    nqp_sched_start( );
+    nqp_sched_init(NQP_SP_RR, NULL);
+    nqp_sched_start();
 
     for (int i = 0; i < THREADS; i++)
     {
         nqp_thread_join(threads[i]);
     }
 
-    print_list( THREADS + 1 );
+    print_list(THREADS + 1);
 
     return EXIT_SUCCESS;
 }
