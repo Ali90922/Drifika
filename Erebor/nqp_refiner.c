@@ -11,6 +11,7 @@
 #define MAX_WORK_UNIT 3
 
 uint8_t progress[THREADS] = {0};
+static int grapher_started = 0;
 
 bool all_full(void)
 {
@@ -70,6 +71,7 @@ void display_progress(void)
 
 void grapher(void *arg)
 {
+    printf("grapher() instance %d started\n", grapher_started++);
     (void)arg;
     // print a graph until all the bars are full.
     while (!all_full())
