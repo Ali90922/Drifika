@@ -93,8 +93,8 @@ int main(void)
 
     // you can uncomment these to see how the behaviour of threads changes with
     // the scheduling policies you've implemented:
-    nqp_sched_init(NQP_SP_RR, NULL);
-    //    nqp_sched_init( NQP_SP_FIFO, NULL );
+    // nqp_sched_init(NQP_SP_RR, NULL);
+    nqp_sched_init(NQP_SP_FIFO, NULL);
     nqp_sched_start();
 
     for (int i = 0; i < THREADS; i++)
