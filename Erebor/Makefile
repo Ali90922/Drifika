@@ -1,4 +1,4 @@
-# COMP 3430 Operating Systems
+
 # Winter 2025
 # Franklin Bristow
 #
@@ -6,11 +6,11 @@
 # to copy and use this Makefile for their own work.
 
 CC = clang
-CFLAGS = -Wall -Werror -Wextra -Wpedantic -O2 -D_FORTIFY_SOURCE=3 -g
+CFLAGS = -Wall -Werror -Wextra -Wpedantic  -D_FORTIFY_SOURCE=3 -g
 
 .PHONY: clean
 
-all: nqp_printer nqp_refiner nqp_sched_tasks nqp_list_insertion test_counter manprinter
+all: nqp_printer nqp_refiner nqp_sched_tasks nqp_list_insertion
 
 nqp_printer: nqp_thread.o
 
@@ -18,32 +18,9 @@ nqp_refiner: nqp_thread.o
 
 nqp_sched_tasks: nqp_thread.o
 
-
-manprinter: ManPrinter.o
-	$(CC) $(CFLAGS) -o manprinter ManPrinter.o
-
-nqp_list_insertion: nqp_list_insertion.o nqp_thread.o nqp_thread_locks.o
-	$(CC) $(CFLAGS) -o nqp_list_insertion nqp_list_insertion.o nqp_thread.o nqp_thread_locks.o
-
-nqp_list_insertion.o: nqp_list_insertion.c
-	$(CC) $(CFLAGS) -c nqp_list_insertion.c
-
-
-# New target for compiling main.c with the custom lock implementation.
-test_counter: main.o nqp_thread_locks.o
-	$(CC) $(CFLAGS) -o test_counter main.o nqp_thread_locks.o
-
-# Rule to build main.o from main.c
-main.o: main.c
-	$(CC) $(CFLAGS) -c main.c
-
-# Rule to build ManPrinter.o from ManPrinter.c
-ManPrinter.o: ManPrinter.c
-	$(CC) $(CFLAGS) -c ManPrinter.c
-
+nqp_list_insertion: nqp_thread.o nqp_thread_locks.o
 
 clean:
-	rm -rf nqp_thread_locks.o nqp_thread.o main.o ManPrinter.o \
-		nqp_printer nqp_refiner nqp_sched_tasks nqp_list_insertion test_counter manprinter
+	rm -rf nqp_thread_locks.o nqp_thread.o nqp_printer nqp_refiner \
+		nqp_sched_tasks nqp_list_insertion
 
-# Dont mess around with the man printer
