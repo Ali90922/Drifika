@@ -18,11 +18,15 @@ nqp_refiner: nqp_thread.o
 
 nqp_sched_tasks: nqp_thread.o
 
-nqp_list_insertion: nqp_thread.o nqp_thread_locks.o
 
 manprinter: ManPrinter.o
 	$(CC) $(CFLAGS) -o manprinter ManPrinter.o
 
+nqp_list_insertion: nqp_list_insertion.o nqp_thread.o nqp_thread_locks.o
+	$(CC) $(CFLAGS) -o nqp_list_insertion nqp_list_insertion.o nqp_thread.o nqp_thread_locks.o
+
+nqp_list_insertion.o: nqp_list_insertion.c
+	$(CC) $(CFLAGS) -c nqp_list_insertion.c
 
 
 # New target for compiling main.c with the custom lock implementation.
