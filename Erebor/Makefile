@@ -10,7 +10,7 @@ CFLAGS = -Wall -Werror -Wextra -Wpedantic -O2 -D_FORTIFY_SOURCE=3 -g
 
 .PHONY: clean
 
-all: nqp_printer nqp_refiner nqp_sched_tasks nqp_list_insertion test_counter
+all: nqp_printer nqp_refiner nqp_sched_tasks nqp_list_insertion test_counter manprinter
 
 nqp_printer: nqp_thread.o
 
@@ -20,8 +20,8 @@ nqp_sched_tasks: nqp_thread.o
 
 nqp_list_insertion: nqp_thread.o nqp_thread_locks.o
 
-nqp_
-
+manprinter: ManPrinter.o
+	$(CC) $(CFLAGS) -o manprinter ManPrinter.o
 
 # New target for compiling main.c with the custom lock implementation.
 test_counter: main.o nqp_thread_locks.o
@@ -31,8 +31,10 @@ test_counter: main.o nqp_thread_locks.o
 main.o: main.c
 	$(CC) $(CFLAGS) -c main.c
 
-# Rule to build the Posix - Printer (Manual Testing).
+# Rule to build ManPrinter.o from ManPrinter.c
+ManPrinter.o: ManPrinter.c
+	$(CC) $(CFLAGS) -c ManPrinter.c
 
 clean:
-	rm -rf nqp_thread_locks.o nqp_thread.o main.o nqp_printer nqp_refiner \
-		nqp_sched_tasks nqp_list_insertion test_counter
+	rm -rf nqp_thread_locks.o nqp_thread.o main.o ManPrinter.o \
+		nqp_printer nqp_refiner nqp_sched_tasks nqp_list_insertion test_counter manprinter
