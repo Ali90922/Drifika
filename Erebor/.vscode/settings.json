@@ -1,5 +1,6 @@
 {
   "files.associations": {
-    "nqp_thread_sched.h": "c"
+    "nqp_thread_sched.h": "c",
+    "stdlib.h": "c"
   }
 }
