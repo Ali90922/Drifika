@@ -89,11 +89,11 @@ int main(void)
     settings.mlfq_settings.queue_time_allotment = 125000;
     settings.mlfq_settings.boost_time = 2000000;
 
-    nqp_sched_init(NQP_SP_MLFQ, &settings);
+    // nqp_sched_init(NQP_SP_MLFQ, &settings);
 
     // you can uncomment these to see how the behaviour of threads changes with
     // the scheduling policies you've implemented:
-    //    nqp_sched_init( NQP_SP_RR, NULL );
+    nqp_sched_init(NQP_SP_RR, NULL);
     //    nqp_sched_init( NQP_SP_FIFO, NULL );
     nqp_sched_start();
 
