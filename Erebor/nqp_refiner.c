@@ -97,7 +97,9 @@ int main(void)
 
     // this can't work with FIFO, all threads need to be able to make progress
     // for the display to work.
-    nqp_sched_init(NQP_SP_RR, NULL);
+
+    // nqp_sched_init(NQP_SP_RR, NULL);
+    nqp_sched_init(NQP_SP_FIFO, NULL);
     nqp_sched_start();
 
     nqp_thread_join(display);

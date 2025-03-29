@@ -245,6 +245,10 @@ void nqp_sched_start(void)
     if (system_policy == NQP_SP_TWOTHREADS)
     {
         // Two-thread policy: just switch to the first thread.
+        // this is for testing swapping between two threads. this
+        // is the default scheduling option (this is what's set
+        // if nqp_sched_init is not called).
+
         current_index = 0;
         current_thread = thread_queue[current_index];
         swapcontext(&main_context, &current_thread->context);
@@ -253,6 +257,12 @@ void nqp_sched_start(void)
     {
         // FIFO scheduling: run threads in the order they were added.
         // The current thread keeps running (i.e., yield does nothing) until it finishes.
+
+        // FIFO scheduling, yield should reschedule the current
+        // task until it is fully complete (it calls
+        // nqp_exit()); this policy will not work with tasks that
+        // attempt to acquire locks (lock acquisition would
+        // result in the same task always being scheduled).
         while (1)
         {
             int unfinished = 0;
