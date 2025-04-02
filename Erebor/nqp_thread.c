@@ -176,11 +176,12 @@ void nqp_yield(void)
         return;
 
     // For FIFO scheduling, yield should not change the running thread.
-    if (system_policy == NQP_SP_FIFO)
+    if (system_policy == NQP_SP_FIFO || system_policy == NQP_SP_MLFQ)
         return;
 
     // For TWOTHREADS, RR, and MLFQ (as a simple placeholder), use round-robin.
     // Come and add back the swapping policy later on !
+
     if (system_policy == NQP_SP_RR)
     {
         nqp_thread_t *prev = current_thread;
