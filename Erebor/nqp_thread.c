@@ -33,7 +33,7 @@ static nqp_scheduling_policy system_policy = NQP_SP_TWOTHREADS;
 // -----------------------------------------------------------------
 // Helper: Add a thread to the global queue
 // -----------------------------------------------------------------
-static void scheduler_add_thread(nqp_thread_t *thread)
+void scheduler_add_thread(nqp_thread_t *thread)
 {
     if (num_threads < MAX_THREADS)
     {
