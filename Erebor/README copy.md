@@ -8,6 +8,7 @@ This assignment implements a user-level threading library using `ucontext_t`. It
 
 ## File Structure
 - `nqp_thread.h/c` – Thread interface and implementation.
+-- `nqp_thread_lock.c/h` -  
 - `nqp_thread_sched.h/c` – Scheduling policy implementations.
 - `main.c` – Sample program demonstrating thread usage.
 - `Makefile` – Build instructions.
