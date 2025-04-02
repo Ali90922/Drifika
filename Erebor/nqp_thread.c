@@ -175,13 +175,16 @@ void nqp_yield(void)
     if (current_thread == NULL)
         return;
 
-    nqp_thread_t *prev = current_thread;
+    // For FIFO scheduling, yield should not change the running thread.
+    if (system_policy == NQP_SP_FIFO)
+        return;
 
-    // Round-robin: advance current_index modulo the number of threads.
+    // For TWOTHREADS, RR, and MLFQ (as a simple placeholder), use round-robin.
+    nqp_thread_t *prev = current_thread;
     int next_index = (current_index + 1) % num_threads;
     nqp_thread_t *next = thread_queue[next_index];
 
-    // Skip finished threads. (This simple loop stops if it circles back to the current thread.)
+    // Skip finished threads.
     int iterations = 0;
     while (next->finished && iterations < num_threads)
     {
@@ -189,14 +192,12 @@ void nqp_yield(void)
         next = thread_queue[next_index];
         iterations++;
     }
-    // If all threads are finished (or the next is still the current one), do nothing.
+    // If there is no available thread to run, simply return.
     if (next == prev)
         return;
 
     current_index = next_index;
     current_thread = next;
-
-    // Swap contexts: save current state and switch to next thread.
     swapcontext(&prev->context, &next->context);
 }
 
