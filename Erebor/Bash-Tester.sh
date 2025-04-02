@@ -6,7 +6,8 @@ make clean
 echo"# Build all targets"
 make
 
-# Run the executables
+echo " Run the executables"
 ./nqp_printer
-./nqp_refiner
+
+#./nqp_refiner
 
