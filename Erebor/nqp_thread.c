@@ -25,8 +25,8 @@ typedef struct nqp_thread_t
     int id; // Unique identifier (optional).
 } nqp_thread_t;
 
-static void thread_wrapper(void (*task)(void *), void *arg, nqp_thread_t *thread);
-static void scheduler_add_thread(nqp_thread_t *thread);
+void thread_wrapper(void (*task)(void *), void *arg, nqp_thread_t *thread);
+void scheduler_add_thread(nqp_thread_t *thread);
 
 // ------------- THREAD CREATION & WRAPPER -------------
 nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
@@ -65,7 +65,7 @@ nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
     return new_thread;
 }
 
-static void thread_wrapper(void (*task)(void *), void *arg, nqp_thread_t *thread)
+void thread_wrapper(void (*task)(void *), void *arg, nqp_thread_t *thread)
 {
     // Execute the user-provided task.
     task(arg);
@@ -74,7 +74,7 @@ static void thread_wrapper(void (*task)(void *), void *arg, nqp_thread_t *thread
     nqp_exit();
 }
 
-static void scheduler_add_thread(nqp_thread_t *thread)
+void scheduler_add_thread(nqp_thread_t *thread)
 {
     if (num_threads < MAX_THREADS)
     {
