@@ -49,7 +49,7 @@ static void scheduler_add_thread(nqp_thread_t *thread)
 // -----------------------------------------------------------------
 // Thread wrapper: calls the user function, marks finished, exits
 // -----------------------------------------------------------------
-static void thread_wrapper(void (*task)(void *), void *arg, nqp_thread_t *thread)
+void thread_wrapper(void (*task)(void *), void *arg, nqp_thread_t *thread)
 {
     task(arg);            // Run the user function
     thread->finished = 1; // Mark finished
