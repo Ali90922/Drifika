@@ -16,7 +16,7 @@ This assignment implements a user-level threading library using `ucontext_t`. It
 ## Compilation & Running
 ```bash
 make
-./nqp_threads
+./nqp_printer
 ./nqp_refiner
 ./test_counter
 ./nqp_sched_tasks
