@@ -24,7 +24,7 @@ make
 
 
 ### Testing Locking 
-I have written code in file main.c that tests my implementation of locking. code tests your custom locking by /n
-having two threads concurrently increment a shared counter while using your custom mutex to enforce mutual  /n
-exclusion. If the lock works correctly, each thread's increments are properly serialized, and the final counter /n
+I have written code in file main.c that tests my implementation of locking. code tests your custom locking by 
+having two threads concurrently increment a shared counter while using your custom mutex to enforce mutual  
+exclusion. If the lock works correctly, each thread's increments are properly serialized, and the final counter
  value will be 2,000,000
