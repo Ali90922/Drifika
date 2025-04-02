@@ -274,6 +274,7 @@ void nqp_sched_start(void)
         // If that thread yields, immediately reschedule it.
         while (1)
         {
+            printf("Hehehehehe-Milan");
             // Find the first worker thread that is not finished.
             nqp_thread_t *next = NULL;
             for (int i = 0; i < num_threads; i++)
