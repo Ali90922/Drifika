@@ -171,27 +171,28 @@ int nqp_sched_init(const nqp_scheduling_policy policy,
  */
 void nqp_yield(void)
 {
-    // If not running inside an NQP thread, do nothing.
-    if (current_thread == NULL)
+    // If we’re not currently in an NQP thread, do nothing.
+    if (!current_thread)
         return;
 
-    // For FIFO scheduling, yield should not change the running thread.
-    if (system_policy == NQP_SP_FIFO || system_policy == NQP_SP_MLFQ)
+    // For FIFO, RR, MLFQ: do nothing here. The big loop in nqp_sched_start picks the next thread.
+    if (system_policy == NQP_SP_FIFO ||
+        system_policy == NQP_SP_RR ||
+        system_policy == NQP_SP_MLFQ)
     {
-        printf("Inside this Clause lad");
         return;
     }
 
-    // For TWOTHREADS, RR, and MLFQ (as a simple placeholder), use round-robin.
-    // Come and add back the swapping policy later on !
-
-    if (system_policy == NQP_SP_RR)
+    // If we are in TWO-THREADS mode, do the round-robin swap here.
+    if (system_policy == NQP_SP_TWOTHREADS)
     {
         nqp_thread_t *prev = current_thread;
+
+        // Go to next index in the array
         int next_index = (current_index + 1) % num_threads;
         nqp_thread_t *next = thread_queue[next_index];
 
-        // Skip finished threads.
+        // Skip finished threads if possible
         int iterations = 0;
         while (next->finished && iterations < num_threads)
         {
@@ -199,8 +200,9 @@ void nqp_yield(void)
             next = thread_queue[next_index];
             iterations++;
         }
-        // If there is no available thread to run, simply return.
-        if (next == prev)
+
+        // If there’s no other valid thread to run, just return
+        if (next == prev || next->finished)
             return;
 
         current_index = next_index;
