@@ -180,25 +180,29 @@ void nqp_yield(void)
         return;
 
     // For TWOTHREADS, RR, and MLFQ (as a simple placeholder), use round-robin.
-    nqp_thread_t *prev = current_thread;
-    int next_index = (current_index + 1) % num_threads;
-    nqp_thread_t *next = thread_queue[next_index];
-
-    // Skip finished threads.
-    int iterations = 0;
-    while (next->finished && iterations < num_threads)
+    // Come and add back the swapping policy later on !
+    if (system_policy == NQP_SP_RR)
     {
-        next_index = (next_index + 1) % num_threads;
-        next = thread_queue[next_index];
-        iterations++;
-    }
-    // If there is no available thread to run, simply return.
-    if (next == prev)
-        return;
+        nqp_thread_t *prev = current_thread;
+        int next_index = (current_index + 1) % num_threads;
+        nqp_thread_t *next = thread_queue[next_index];
 
-    current_index = next_index;
-    current_thread = next;
-    swapcontext(&prev->context, &next->context);
+        // Skip finished threads.
+        int iterations = 0;
+        while (next->finished && iterations < num_threads)
+        {
+            next_index = (next_index + 1) % num_threads;
+            next = thread_queue[next_index];
+            iterations++;
+        }
+        // If there is no available thread to run, simply return.
+        if (next == prev)
+            return;
+
+        current_index = next_index;
+        current_thread = next;
+        swapcontext(&prev->context, &next->context);
+    }
 }
 
 /**
