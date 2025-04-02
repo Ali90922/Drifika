@@ -296,6 +296,7 @@ void nqp_sched_start(void)
             // When the thread yields (calling nqp_yield), control will return here.
             swapcontext(&main_context, &current_thread->context);
             // After returning, if the thread hasn't finished, the loop will pick it again.
+            printf("Hehehehehe-Milan");
         }
     }
 
@@ -327,6 +328,7 @@ void nqp_sched_start(void)
             current_thread = thread_queue[current_index];
             swapcontext(&main_context, &current_thread->context);
         }
+        printf("Hehehehehe");
     }
     else if (system_policy == NQP_SP_MLFQ)
     {
