@@ -19,6 +19,7 @@ make
 ./nqp_threads
 ./nqp_refiner
 ./test_counter
+./nqp_sched_tasks
 ```
 
 
