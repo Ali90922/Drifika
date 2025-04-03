@@ -240,6 +240,10 @@ void nqp_yield(void)
         current_index = next_i;
         swapcontext(&prev->context, &next->context);
     }
+
+    if (system_policy == NQP_SP_MLFQ)
+    {
+    }
 }
 
 /**
