@@ -176,8 +176,7 @@ void nqp_yield(void)
         return;
 
     // For FIFO, RR, MLFQ: do nothing here. The big loop in nqp_sched_start picks the next thread.
-    if (system_policy == NQP_SP_FIFO ||
-        system_policy == NQP_SP_MLFQ)
+    if (system_policy == NQP_SP_MLFQ)
     {
         return;
     }
@@ -206,6 +205,39 @@ void nqp_yield(void)
 
         current_index = next_index;
         current_thread = next;
+        swapcontext(&prev->context, &next->context);
+    }
+
+    if (system_policy == NQP_SP_FIFO)
+    {
+        // *FIFO approach*: keep running the same thread until it finishes.
+        // So if the current thread is not finished, do nothing.
+        if (!current_thread->finished)
+            return;
+
+        // If the current thread just finished, pick the next unfinished from the front
+        nqp_thread_t *prev = current_thread;
+
+        // Find the first thread in [0..num_threads-1] that is not finished
+        nqp_thread_t *next = NULL;
+        int next_i = -1;
+        for (int i = 0; i < num_threads; i++)
+        {
+            if (!thread_queue[i]->finished)
+            {
+                next = thread_queue[i];
+                next_i = i;
+                break;
+            }
+        }
+        if (!next)
+        {
+            // no more threads to run
+            return;
+        }
+
+        current_thread = next;
+        current_index = next_i;
         swapcontext(&prev->context, &next->context);
     }
 }
