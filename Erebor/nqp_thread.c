@@ -279,7 +279,7 @@ void nqp_sched_start(void)
         // If that thread yields, immediately reschedule it.
         while (1)
         {
-            printf("Hehehehehe-Milan");
+
             // Find the first worker thread that is not finished.
             nqp_thread_t *next = NULL;
             for (int i = 0; i < num_threads; i++)
@@ -302,7 +302,6 @@ void nqp_sched_start(void)
             // When the thread yields (calling nqp_yield), control will return here.
             swapcontext(&main_context, &current_thread->context);
             // After returning, if the thread hasn't finished, the loop will pick it again.
-            printf("Hehehehehe-Milan");
         }
     }
 
