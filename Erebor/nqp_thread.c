@@ -364,7 +364,6 @@ void nqp_sched_start(void)
             current_thread = thread_queue[current_index];
             swapcontext(&main_context, &current_thread->context);
         }
-        printf("Hehehehehe");
     }
     else if (system_policy == NQP_SP_MLFQ)
     {
