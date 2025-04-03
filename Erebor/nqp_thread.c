@@ -177,14 +177,13 @@ void nqp_yield(void)
 
     // For FIFO, RR, MLFQ: do nothing here. The big loop in nqp_sched_start picks the next thread.
     if (system_policy == NQP_SP_FIFO ||
-        system_policy == NQP_SP_RR ||
         system_policy == NQP_SP_MLFQ)
     {
         return;
     }
 
     // If we are in TWO-THREADS mode, do the round-robin swap here.
-    if (system_policy == NQP_SP_TWOTHREADS)
+    if (system_policy == NQP_SP_TWOTHREADS || system_policy == NQP_SP_RR)
     {
         nqp_thread_t *prev = current_thread;
 
