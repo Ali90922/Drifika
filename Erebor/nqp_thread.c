@@ -244,6 +244,8 @@ void nqp_yield(void)
     if (system_policy == NQP_SP_MLFQ)
     {
 
+        ucontext_t main_context;
+
         // Code is moved from the sched start fucntion
 
         // MLFQ scheduling: assume 3 queues for simplicity.
