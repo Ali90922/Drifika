@@ -243,6 +243,65 @@ void nqp_yield(void)
 
     if (system_policy == NQP_SP_MLFQ)
     {
+
+        // Code is moved from the sched start fucntion
+
+        // MLFQ scheduling: assume 3 queues for simplicity.
+#define NUM_QUEUES 3
+        // Local arrays for queues and their sizes.
+        nqp_thread_t *queues[NUM_QUEUES][MAX_THREADS] = {{0}};
+        int queue_sizes[NUM_QUEUES] = {0};
+        // Initially, place all threads in the highest-priority queue (queue 0).
+        for (int i = 0; i < num_threads; i++)
+        {
+            queues[0][queue_sizes[0]++] = thread_queue[i];
+        }
+        // We'll use a simple RR within each queue.
+        int rr_indices[NUM_QUEUES] = {0};
+
+        while (1)
+        {
+            int all_done = 1;
+            for (int i = 0; i < num_threads; i++)
+            {
+                if (!thread_queue[i]->finished)
+                {
+                    all_done = 0;
+                    break;
+                }
+            }
+            if (all_done)
+                break;
+
+            // Find the highest priority queue that is non-empty.
+            int queue_level = -1;
+            for (int i = 0; i < NUM_QUEUES; i++)
+            {
+                if (queue_sizes[i] > 0)
+                {
+                    queue_level = i;
+                    break;
+                }
+            }
+            if (queue_level == -1)
+                break; // Shouldn't happen if there are unfinished threads.
+
+            // Select the next thread from that queue using round-robin.
+            nqp_thread_t *next = queues[queue_level][rr_indices[queue_level] % queue_sizes[queue_level]];
+            rr_indices[queue_level] = (rr_indices[queue_level] + 1) % queue_sizes[queue_level];
+
+            current_thread = next;
+            swapcontext(&main_context, &current_thread->context);
+
+            // After returning, if the thread is not finished, demote it to a lower priority queue.
+            if (!next->finished && queue_level < NUM_QUEUES - 1)
+            {
+                // Remove it from the current queue (for simplicity, we won't recompact the array)
+                // and add it to the next lower queue.
+                queues[queue_level + 1][queue_sizes[queue_level + 1]++] = next;
+            }
+        }
+#undef NUM_QUEUES
     }
 }
 
@@ -371,7 +430,7 @@ void nqp_sched_start(void)
     }
     else if (system_policy == NQP_SP_MLFQ)
     {
-// MLFQ scheduling: assume 3 queues for simplicity.
+        // MLFQ scheduling: assume 3 queues for simplicity.
 #define NUM_QUEUES 3
         // Local arrays for queues and their sizes.
         nqp_thread_t *queues[NUM_QUEUES][MAX_THREADS] = {{0}};
