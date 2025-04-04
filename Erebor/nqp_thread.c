@@ -341,161 +341,21 @@ void nqp_exit(void)
  * nqp_thread_join for each thread it has started.
  */
 
+// Newer Version of this function -- all the scheduling code is moved to nqp_yeild now
+// nqp_sched_start now just executes the first thread of execution on our thread queue
 void nqp_sched_start(void)
 {
     if (num_threads == 0)
         return;
 
-    // For simplicity, we'll create a main_context variable that we reuse.
     ucontext_t main_context;
+    // Initialize with the first thread.
+    current_index = 0;
+    current_thread = thread_queue[current_index];
+    // Start execution of the first thread.
+    swapcontext(&main_context, &current_thread->context);
 
-    if (system_policy == NQP_SP_TWOTHREADS)
-    {
-        // Two-thread policy: just switch to the first thread.
-        // this is for testing swapping between two threads. this
-        // is the default scheduling option (this is what's set
-        // if nqp_sched_init is not called).
-
-        current_index = 0;
-        current_thread = thread_queue[current_index];
-        swapcontext(&main_context, &current_thread->context);
-    }
-
-    else if (system_policy == NQP_SP_FIFO)
-    {
-        // FIFO scheduling: run threads in the order they were added.
-        // The current thread keeps running (i.e., yield does nothing) until it finishes.
-
-        // FIFO scheduling, yield should reschedule the current
-        // task until it is fully complete (it calls
-        // nqp_exit()); this policy will not work with tasks that
-        // attempt to acquire locks (lock acquisition would
-        // result in the same task always being scheduled).
-        // FIFO scheduling: always run the first unfinished worker thread.
-        // If that thread yields, immediately reschedule it.
-        while (1)
-        {
-
-            // Find the first worker thread that is not finished.
-            nqp_thread_t *next = NULL;
-            for (int i = 0; i < num_threads; i++)
-            {
-                if (!thread_queue[i]->finished)
-                {
-                    next = thread_queue[i];
-                    break;
-                }
-            }
-            // If no unfinished worker thread is found, all threads are done.
-            if (next == NULL)
-            {
-                break;
-            }
-
-            // Set the current thread to the selected worker.
-            current_thread = next;
-            // Swap to that thread's context.
-            // When the thread yields (calling nqp_yield), control will return here.
-            swapcontext(&main_context, &current_thread->context);
-            // After returning, if the thread hasn't finished, the loop will pick it again.
-        }
-    }
-
-    else if (system_policy == NQP_SP_RR)
-    {
-        // Round-robin scheduling: rotate through the thread queue.
-        current_index = 0;
-        current_thread = thread_queue[current_index];
-        while (1)
-        {
-            int unfinished = 0;
-            // Check if any thread is still running.
-            for (int i = 0; i < num_threads; i++)
-            {
-                if (!thread_queue[i]->finished)
-                {
-                    unfinished = 1;
-                    break;
-                }
-            }
-            if (!unfinished)
-                break;
-
-            // Advance current_index in round-robin fashion.
-            current_index = (current_index + 1) % num_threads;
-            // Skip finished threads.
-            while (thread_queue[current_index]->finished)
-                current_index = (current_index + 1) % num_threads;
-            current_thread = thread_queue[current_index];
-            swapcontext(&main_context, &current_thread->context);
-        }
-    }
-    else if (system_policy == NQP_SP_MLFQ)
-    {
-        // MLFQ scheduling: assume 3 queues for simplicity.
-#define NUM_QUEUES 3
-        // Local arrays for queues and their sizes.
-        nqp_thread_t *queues[NUM_QUEUES][MAX_THREADS] = {{0}};
-        int queue_sizes[NUM_QUEUES] = {0};
-        // Initially, place all threads in the highest-priority queue (queue 0).
-        for (int i = 0; i < num_threads; i++)
-        {
-            queues[0][queue_sizes[0]++] = thread_queue[i];
-        }
-        // We'll use a simple RR within each queue.
-        int rr_indices[NUM_QUEUES] = {0};
-
-        while (1)
-        {
-            int all_done = 1;
-            for (int i = 0; i < num_threads; i++)
-            {
-                if (!thread_queue[i]->finished)
-                {
-                    all_done = 0;
-                    break;
-                }
-            }
-            if (all_done)
-                break;
-
-            // Find the highest priority queue that is non-empty.
-            int queue_level = -1;
-            for (int i = 0; i < NUM_QUEUES; i++)
-            {
-                if (queue_sizes[i] > 0)
-                {
-                    queue_level = i;
-                    break;
-                }
-            }
-            if (queue_level == -1)
-                break; // Shouldn't happen if there are unfinished threads.
-
-            // Select the next thread from that queue using round-robin.
-            nqp_thread_t *next = queues[queue_level][rr_indices[queue_level] % queue_sizes[queue_level]];
-            rr_indices[queue_level] = (rr_indices[queue_level] + 1) % queue_sizes[queue_level];
-
-            current_thread = next;
-            swapcontext(&main_context, &current_thread->context);
-
-            // After returning, if the thread is not finished, demote it to a lower priority queue.
-            if (!next->finished && queue_level < NUM_QUEUES - 1)
-            {
-                // Remove it from the current queue (for simplicity, we won't recompact the array)
-                // and add it to the next lower queue.
-                queues[queue_level + 1][queue_sizes[queue_level + 1]++] = next;
-            }
-        }
-#undef NUM_QUEUES
-    }
-    else
-    {
-        // Default fallback: use two-thread scheduling.
-        current_index = 0;
-        current_thread = thread_queue[current_index];
-        swapcontext(&main_context, &current_thread->context);
-    }
+    // When control returns here, all threads should have finished.
 }
 
 // Problems to fix :
