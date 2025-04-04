@@ -322,3 +322,12 @@ void nqp_sched_start(void)
 #undef NUM_QUEUES
     }
 }
+
+// Problems to fix :
+// The output remains similar because the yield function always uses a round-robin mechanism regardless
+// of the scheduling policy set at initialization. Additionally, using “nqp_sched_int” (likely a typo
+// for “nqp_sched_init”) may be causing your intended policy (MLFQ, FIFO, or RR) not to be applied, so the
+// threads are scheduled in the same order.
+
+// Also MLFQ - giving problem s -- need implementation of it in sched start -- all other policies are implemented
+// in nqp yeild
