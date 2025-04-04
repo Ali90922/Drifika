@@ -3,46 +3,35 @@
 #include <assert.h>
 #include <ucontext.h>
 #include <signal.h>
+#include <time.h>
 
 #include "nqp_thread.h"
 #include "nqp_thread_sched.h"
-// For simplicity, assume we have a fixed-size thread queue.
 
 #define MAX_THREADS 50
 
-// Queue Datastructures to hold the threads :
-
-// Global scheduler queue: holds pointers to all NQP threads that are runnable.
+// Global thread queue:
 static nqp_thread_t *thread_queue[MAX_THREADS];
-static int num_threads = 0;   // How many threads have been added to the scheduler.
+static int num_threads = 0;   // Count of threads in the scheduler.
 static int current_index = 0; // Index of the currently running thread.
-
-// Global pointer to the currently running thread.
 static nqp_thread_t *current_thread = NULL;
 
+// Global scheduler context for MLFQ mode.
+static ucontext_t scheduler_context;
+
+// Thread control block.
 typedef struct nqp_thread_t
 {
     ucontext_t context;
     void *stack;
-    int finished; // 0 means running, 1 means finished
-    // Optionally, add thread ID, status, priority, etc.
-    int id; // Unique identifier for the thread.
+    int finished; // 0: running, 1: finished.
+    int id;       // Unique thread identifier.
+    // Optionally, add fields for MLFQ (e.g., current queue, runtime, etc.).
 } nqp_thread_t;
 
 static nqp_scheduling_policy system_policy = NQP_SP_TWOTHREADS;
 
-/**
- * Initialize an nqp_thread_t.
- *
- * Args:
- *  task: the function that this thread should begin executing in. Must not be
- *        NULL.
- *  arg: the arguments to be passed to the function. May be NULL if the function
- *       does not actually use the arguments passed to it.
- * Return: An initialized thread or NULL on error.
- */
-
-// nqp_thread_create creates and intialises and returns  a Thread control block that is ready to be scheduled
+/* nqp_thread_create: creates and initializes a thread */
 nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
 {
     assert(task != NULL);
@@ -65,34 +54,29 @@ nqp_thread_t *nqp_thread_create(void (*task)(void *), void *arg)
     }
 
     new_thread->finished = 0;
-    // (Optional) You already have an 'id' field; you might assign it here.
+    // (Optional) assign a unique id here.
 
     new_thread->context.uc_stack.ss_sp = new_thread->stack;
     new_thread->context.uc_stack.ss_size = SIGSTKSZ;
     new_thread->context.uc_stack.ss_flags = 0;
     new_thread->context.uc_link = NULL;
 
-    // Use thread_wrapper to run the task, mark finished, and exit.
+    // Setup the thread to run thread_wrapper.
     makecontext(&new_thread->context, (void (*)(void))thread_wrapper, 3, task, arg, new_thread);
 
-    // Add the new thread to the scheduler's queue.
     scheduler_add_thread(new_thread);
-
     return new_thread;
 }
 
-// Helper Function -- for the Done Flag
+/* thread_wrapper: executes the task then marks the thread finished */
 void thread_wrapper(void (*task)(void *), void *arg, nqp_thread_t *thread)
 {
-    // Execute the user-provided function.
     task(arg);
-    // Mark the thread as finished.
     thread->finished = 1;
-    // Terminate the thread (and remove it from the scheduler).
     nqp_exit();
 }
 
-// Helper Function to add thread to the global queue
+/* scheduler_add_thread: adds a thread to the global thread queue */
 void scheduler_add_thread(nqp_thread_t *thread)
 {
     if (num_threads < MAX_THREADS)
@@ -101,58 +85,29 @@ void scheduler_add_thread(nqp_thread_t *thread)
     }
     else
     {
-        // Handle error: exceeded maximum threads (or dynamically grow the queue)
         fprintf(stderr, "Exceeded maximum thread capacity!\n");
         exit(EXIT_FAILURE);
     }
 }
 
-/**
- * Wait for the specified thread to finish. This function will block the caller
- * until the specified thread is finished its current task.
- *
- * Args:
- *  thread: the thread to wait for. Must not be NULL. Must have been previously
- *          initialized.
- * Return: 0 on success (e.g., the thread has exited), -1 on failure.
- */
-
+/* nqp_thread_join: busy-wait until thread finishes */
 int nqp_thread_join(nqp_thread_t *thread)
 {
     assert(thread != NULL);
-
-    // Busy-wait (with yielding) until the thread is finished.
     while (!thread->finished)
     {
         nqp_yield();
     }
-
-    return 0; // Successfully joined.
+    return 0;
 }
 
-// 4 Fucntions from nqp_thread_sched.h !
-
-/**
- * The policy that should be used when deciding which task to switch to next
- * upon a call to yield.
- *
- * Args:
- *  policy: the policy to apply. Must be a policy as defined in
- *          NQP_SCHEDULING_POLICY.
- *  settings: The settings for the policy to apply. May be NULL, depending on
- *            the policy being set. See nqp_scheduling_policy.
- * Returns: 0 on success, -1 on failure (e.g., the specified policy is not in
- *          NQP_SCHEDULING_POLICY).
- */
-
+/* nqp_sched_init: sets the scheduling policy */
 int nqp_sched_init(const nqp_scheduling_policy policy,
                    const nqp_sp_settings *settings)
 {
-    int ret = -1;
     (void)settings;
-
+    int ret = -1;
     assert(policy >= NQP_SP_TWOTHREADS && policy < NQP_SP_POLICIES);
-
     if (policy >= NQP_SP_TWOTHREADS && policy < NQP_SP_POLICIES)
     {
         system_policy = policy;
@@ -161,36 +116,27 @@ int nqp_sched_init(const nqp_scheduling_policy policy,
     return ret;
 }
 
-/**
- * Voluntarily give up control of the processor and allow the scheduler to
- * schedule another task.
- *
- * When called outside of the context of an NQP thread (e.g., nqp_thread_start
- * has not been called), this function should have no side-effects at all (the
- * function should behave as a no-op).
+/* nqp_yield: yields control to the scheduler.
+ * For MLFQ, swap back to the scheduler context.
  */
 void nqp_yield(void)
 {
-    // If we’re not currently in an NQP thread, do nothing.
     if (!current_thread)
         return;
 
-    // For FIFO, RR, MLFQ: do nothing here. The big loop in nqp_sched_start picks the next thread.
     if (system_policy == NQP_SP_MLFQ)
     {
+        /* In MLFQ mode, yield back to the scheduler */
+        swapcontext(&current_thread->context, &scheduler_context);
         return;
     }
 
-    // If we are in TWO-THREADS mode, do the round-robin swap here.
     if (system_policy == NQP_SP_TWOTHREADS || system_policy == NQP_SP_RR)
     {
         nqp_thread_t *prev = current_thread;
-
-        // Go to next index in the array
         int next_index = (current_index + 1) % num_threads;
         nqp_thread_t *next = thread_queue[next_index];
 
-        // Skip finished threads if possible
         int iterations = 0;
         while (next->finished && iterations < num_threads)
         {
@@ -198,27 +144,19 @@ void nqp_yield(void)
             next = thread_queue[next_index];
             iterations++;
         }
-
-        // If there’s no other valid thread to run, just return
         if (next == prev || next->finished)
             return;
-
         current_index = next_index;
         current_thread = next;
         swapcontext(&prev->context, &next->context);
+        return;
     }
 
     if (system_policy == NQP_SP_FIFO)
     {
-        // *FIFO approach*: keep running the same thread until it finishes.
-        // So if the current thread is not finished, do nothing.
         if (!current_thread->finished)
             return;
-
-        // If the current thread just finished, pick the next unfinished from the front
         nqp_thread_t *prev = current_thread;
-
-        // Find the first thread in [0..num_threads-1] that is not finished
         nqp_thread_t *next = NULL;
         int next_i = -1;
         for (int i = 0; i < num_threads; i++)
@@ -231,38 +169,68 @@ void nqp_yield(void)
             }
         }
         if (!next)
-        {
-            // no more threads to run
             return;
-        }
-
         current_thread = next;
         current_index = next_i;
         swapcontext(&prev->context, &next->context);
+        return;
     }
+}
 
-    if (system_policy == NQP_SP_MLFQ)
+/* nqp_exit: marks the current thread as finished and yields */
+void nqp_exit(void)
+{
+    if (current_thread != NULL)
+        current_thread->finished = 1;
+    nqp_yield();
+    exit(0);
+}
+
+/* nqp_sched_start: starts the scheduling of threads.
+ * For non-MLFQ policies, simply start the first thread.
+ * For MLFQ, run a scheduling loop with time-slice measurement and boosting.
+ */
+void nqp_sched_start(void)
+{
+    if (num_threads == 0)
+        return;
+
+    if (system_policy != NQP_SP_MLFQ)
     {
-
         ucontext_t main_context;
-
-        // Code is moved from the sched start fucntion
-
-        // MLFQ scheduling: assume 3 queues for simplicity.
+        current_index = 0;
+        current_thread = thread_queue[current_index];
+        swapcontext(&main_context, &current_thread->context);
+    }
+    else
+    {
+        // ---- MLFQ Scheduling Implementation ----
 #define NUM_QUEUES 3
-        // Local arrays for queues and their sizes.
-        nqp_thread_t *queues[NUM_QUEUES][MAX_THREADS] = {{0}};
-        int queue_sizes[NUM_QUEUES] = {0};
+        // Persistent arrays for the three MLFQ queues.
+        static nqp_thread_t *mlfq_queues[NUM_QUEUES][MAX_THREADS] = {{0}};
+        static int mlfq_queue_sizes[NUM_QUEUES] = {0};
+        static int rr_indices[NUM_QUEUES] = {0};
+
+        // Time-slice and boost parameters.
+        const long time_slice_us = 125000;      // 125,000 µs = 0.125 sec.
+        const long boost_interval_us = 2000000; // 2,000,000 µs = 2 sec.
+
+        // Record the last boost time.
+        struct timespec last_boost_time;
+        clock_gettime(CLOCK_REALTIME, &last_boost_time);
+
         // Initially, place all threads in the highest-priority queue (queue 0).
         for (int i = 0; i < num_threads; i++)
         {
-            queues[0][queue_sizes[0]++] = thread_queue[i];
+            mlfq_queues[0][mlfq_queue_sizes[0]++] = thread_queue[i];
         }
-        // We'll use a simple RR within each queue.
-        int rr_indices[NUM_QUEUES] = {0};
+
+        // Initialize the scheduler context.
+        getcontext(&scheduler_context);
 
         while (1)
         {
+            // Check if all threads have finished.
             int all_done = 1;
             for (int i = 0; i < num_threads; i++)
             {
@@ -275,93 +243,82 @@ void nqp_yield(void)
             if (all_done)
                 break;
 
-            // Find the highest priority queue that is non-empty.
-            int queue_level = -1;
-            for (int i = 0; i < NUM_QUEUES; i++)
+            // Boost: if boost interval has elapsed, move all unfinished threads to queue 0.
+            struct timespec now;
+            clock_gettime(CLOCK_REALTIME, &now);
+            long elapsed_us = (now.tv_sec - last_boost_time.tv_sec) * 1000000L +
+                              (now.tv_nsec - last_boost_time.tv_nsec) / 1000;
+            if (elapsed_us >= boost_interval_us)
             {
-                if (queue_sizes[i] > 0)
+                for (int q = 1; q < NUM_QUEUES; q++)
                 {
-                    queue_level = i;
+                    for (int j = 0; j < mlfq_queue_sizes[q]; j++)
+                    {
+                        nqp_thread_t *t = mlfq_queues[q][j];
+                        if (!t->finished)
+                        {
+                            mlfq_queues[0][mlfq_queue_sizes[0]++] = t;
+                        }
+                    }
+                    mlfq_queue_sizes[q] = 0;
+                    rr_indices[q] = 0;
+                }
+                last_boost_time = now;
+            }
+
+            // Find the highest priority queue with runnable threads.
+            int queue_level = -1;
+            for (int q = 0; q < NUM_QUEUES; q++)
+            {
+                if (mlfq_queue_sizes[q] > 0)
+                {
+                    queue_level = q;
                     break;
                 }
             }
             if (queue_level == -1)
-                break; // Shouldn't happen if there are unfinished threads.
+                break; // No runnable threads found.
 
-            // Select the next thread from that queue using round-robin.
-            nqp_thread_t *next = queues[queue_level][rr_indices[queue_level] % queue_sizes[queue_level]];
-            rr_indices[queue_level] = (rr_indices[queue_level] + 1) % queue_sizes[queue_level];
+            // Select the next thread using round-robin from the chosen queue.
+            int idx = rr_indices[queue_level] % mlfq_queue_sizes[queue_level];
+            nqp_thread_t *next = mlfq_queues[queue_level][idx];
+            rr_indices[queue_level] = (rr_indices[queue_level] + 1) % mlfq_queue_sizes[queue_level];
+
+            // If the selected thread is finished, remove it from the queue.
+            if (next->finished)
+            {
+                mlfq_queues[queue_level][idx] = mlfq_queues[queue_level][mlfq_queue_sizes[queue_level] - 1];
+                mlfq_queue_sizes[queue_level]--;
+                continue;
+            }
+
+            // Record the start time for this time slice.
+            struct timespec start_time;
+            clock_gettime(CLOCK_REALTIME, &start_time);
 
             current_thread = next;
-            swapcontext(&main_context, &current_thread->context);
+            /* Switch from scheduler context to the thread.
+             * When the thread calls nqp_yield, it will swap back into scheduler_context.
+             */
+            swapcontext(&scheduler_context, &current_thread->context);
 
-            // After returning, if the thread is not finished, demote it to a lower priority queue.
-            if (!next->finished && queue_level < NUM_QUEUES - 1)
+            // When the thread yields, record the end time.
+            struct timespec end_time;
+            clock_gettime(CLOCK_REALTIME, &end_time);
+            long slice_us = (end_time.tv_sec - start_time.tv_sec) * 1000000L +
+                            (end_time.tv_nsec - start_time.tv_nsec) / 1000;
+
+            // If the thread used up its time slice, demote it to a lower queue (if not already at the lowest level).
+            if (slice_us >= time_slice_us && queue_level < NUM_QUEUES - 1)
             {
-                // Remove it from the current queue (for simplicity, we won't recompact the array)
-                // and add it to the next lower queue.
-                queues[queue_level + 1][queue_sizes[queue_level + 1]++] = next;
+                // Remove from current queue by replacing it with the last element.
+                mlfq_queues[queue_level][idx] = mlfq_queues[queue_level][mlfq_queue_sizes[queue_level] - 1];
+                mlfq_queue_sizes[queue_level]--;
+                // Add the thread to the next lower queue.
+                mlfq_queues[queue_level + 1][mlfq_queue_sizes[queue_level + 1]++] = next;
             }
+            // Otherwise, leave the thread in its current queue.
         }
 #undef NUM_QUEUES
     }
 }
-
-/**
- * The current task is done, it should be removed from the queue of tasks to
- * be scheduled.
- *
- * When called outside of the context of an NQP thread (e.g., nqp_thread_start
- * has not been called), this function should have no side-effects at all (the
- * function should behave as a no-op).
- */
-void nqp_exit(void)
-{
-    // Mark the current thread as finished.
-    if (current_thread != NULL)
-        current_thread->finished = 1;
-
-    // Yield control to allow the scheduler to pick another thread.
-    nqp_yield();
-
-    // In a well-designed system, execution should never return here.
-    // If it does, exit the process.
-    exit(0);
-}
-
-/**
- * Start scheduling tasks.
- *
- * If the NQP_SP_TWOTHREADS policy is selected, control flow will never return
- * to the caller (the program must be terminated by sending the SIGINT signal).
- *
- * If any other scheduling policy is selected, control flow will eventually
- * return to the caller. The caller is then responsible for blocking itself
- * until all threads of execution that it has started have finished by calling
- * nqp_thread_join for each thread it has started.
- */
-
-// Newer Version of this function -- all the scheduling code is moved to nqp_yeild now
-// nqp_sched_start now just executes the first thread of execution on our thread queue
-void nqp_sched_start(void)
-{
-    if (num_threads == 0)
-        return;
-
-    ucontext_t main_context;
-    // Initialize with the first thread.
-    current_index = 0;
-    current_thread = thread_queue[current_index];
-    // Start execution of the first thread.
-    swapcontext(&main_context, &current_thread->context);
-
-    // When control returns here, all threads should have finished.
-}
-
-// Problems to fix :
-// The output remains similar because the yield function always uses a round-robin mechanism regardless
-// of the scheduling policy set at initialization. Additionally, using “nqp_sched_int” (likely a typo
-// for “nqp_sched_init”) may be causing my intended policy (MLFQ, FIFO, or RR) not to be applied, so the
-// threads are scheduled in the same order.
-
-// Problem with the mlfq in the yield function -- I don't thin we are swapping the contexts properly or somethin
