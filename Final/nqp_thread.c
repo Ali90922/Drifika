@@ -177,6 +177,7 @@ void nqp_yield(void)
     }
 }
 
+
 /* nqp_exit: marks the current thread as finished and yields */
 void nqp_exit(void)
 {
