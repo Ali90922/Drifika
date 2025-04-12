@@ -43,6 +43,10 @@ void *deposit(void *ptr) {
   deposit_thr_args *args = (deposit_thr_args *)ptr;
 
 
+// The commented block is designed to enforce a total order on which mutex to lock first. 
+  //In other words, every thread will try to acquire the two locks in the same order, regardless 
+//of whether the deposit logically goes from A to B or B to A. Let’s examine the block
+
 // ORDER ACCOUNTs TO BREAK CIRCULAR WAIT
 
 /*  bank_account *from, *to;
