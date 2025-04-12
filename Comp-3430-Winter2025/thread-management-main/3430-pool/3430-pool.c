@@ -129,8 +129,8 @@ int thr_pool_queue(thr_pool_t *pool, void *(*func)(void *), void *arg) {
        pthread_mutex_lock( &pool->pool_mutex );
        enqueue( pool->jobs, job );
        // signal to waiting threads that there is work for them to do
-       pthread_cond_signal( &pool->pool_workcv );
-       pthread_mutex_unlock( &pool->pool_mutex );
+       pthread_cond_signal( &pool->pool_workcv ); // Wakes up 1 thread to do the work
+       pthread_mutex_unlock( &pool->pool_mutex );   // Release the lock so the thread waking up from the wait call is able to acquire the lock
        status = 0;
     }
   }
