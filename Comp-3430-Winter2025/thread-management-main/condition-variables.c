@@ -63,6 +63,9 @@ int main(void)
     while ( threads_ready < NUM_THREADS ) {}
 
     /*
+
+    // This is the first Example shown in class -- LECTURE 22 -- This one makes sense
+
     while ( threads_ready > 0 )
     {
         printf("Press enter to signal a thread.");
