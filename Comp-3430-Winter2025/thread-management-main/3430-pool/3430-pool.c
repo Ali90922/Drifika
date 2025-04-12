@@ -64,9 +64,9 @@ static void *worker_thread(void *arg) {
     else if ( pool->pool_wait )
     {
         // if we have been told to shut down, then release the lock
-        pthread_mutex_unlock( &pool->pool_mutex );
+        pthread_mutex_unlock( &pool->pool_mutex );    // This is the Bug Franklin added in Lecture 23 -- Need to unlock this lock !
     }
-  }
+  } 
 
   // exiting, tell everyone else:
   pthread_mutex_lock( &pool->pool_mutex );
