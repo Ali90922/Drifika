@@ -5,6 +5,9 @@
 #include <unistd.h>
 #include <openssl/sha.h>
 
+// How to run : 
+//gcc file_hash_logger.c -o file_hash_logger -pthread -lssl -lcrypto
+
 #define NUM_FILES 3
 
 const char* filenames[] = {"file1.txt", "file2.txt", "file3.txt"};
