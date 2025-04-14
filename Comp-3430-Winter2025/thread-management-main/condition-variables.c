@@ -36,7 +36,7 @@ void *work(void *args)
     printf("Received signal in %d.\n", gettid());
 
     // do your work on the shared object
-    
+
     
     pthread_mutex_unlock( &cv_lock );
     
@@ -67,13 +67,17 @@ int main(void)
 
     // This is the first Example shown in class -- LECTURE 22 -- This one makes sense
 
+    // This is the signal code -- the code below uses broadcast 
+
     while ( threads_ready > 0 )
     {
         printf("Press enter to signal a thread.");
         getchar();
 
         pthread_mutex_lock( &cv_lock );
+
         // wake up exactly one waiting thread
+
         pthread_cond_signal( &cv );
         pthread_mutex_unlock( &cv_lock );
 
