@@ -63,10 +63,6 @@ void *deposit(void *ptr) {
   }
 */
 
-
-
-
-
     //pthread_mutex_lock( &deposit_lock );
 
   // we're going to modify "from", lock it so nobody else tries to modify it at
@@ -106,6 +102,9 @@ deposit_thr_args *create_transfer(bank_account *from, bank_account *to,
 
   return transfer;
 }
+
+
+
 
 int main(void) {
 
