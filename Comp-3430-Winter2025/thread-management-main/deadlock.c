@@ -134,3 +134,9 @@ int main(void) {
 
   return 0;
 }
+
+// 4 conditions for deadlock 
+// 1 . Circular Wait 
+// 2 . No Preemption 
+// 3 . Hold and Wait 
+// 4 . Mutual Exclusion 
