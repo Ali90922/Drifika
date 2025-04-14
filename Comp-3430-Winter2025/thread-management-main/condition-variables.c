@@ -7,7 +7,7 @@
 #include <stdatomic.h>
 
 pthread_mutex_t cv_lock = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t  cv;
+pthread_cond_t  cv;     // Each Condition Variable must be used with a mutex(Lock)
 
 atomic_uint threads_ready = 0;
 
@@ -36,6 +36,7 @@ void *work(void *args)
     printf("Received signal in %d.\n", gettid());
 
     // do your work on the shared object
+    
     
     pthread_mutex_unlock( &cv_lock );
     
