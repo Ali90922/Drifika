@@ -2,6 +2,7 @@
 ![Alt text](Assets/Drifka.jpg)
 
 
+
 Week 1: Course introduction, review, and operating system basics.  
 Week 2: File systems implementation.  
 Week 3: File systems consistency and redundancy.  
